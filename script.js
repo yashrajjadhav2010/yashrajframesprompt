@@ -27,10 +27,14 @@
     savedSubTab: 'pins' // 'pins' or 'history'
   };
 
-  const promptList = (typeof prompts !== 'undefined' && Array.isArray(prompts)) ? prompts : [];
-  const categoriesList = (typeof CATEGORIES !== 'undefined' && Array.isArray(CATEGORIES)) 
-    ? CATEGORIES 
-    : ['All', 'Wedding', 'Portrait', 'Couple', 'Birthday', 'Baby Photography', 'Traditional', 'Royal', 'Cinematic', 'Restoration', 'Passport', 'Festival', 'Other'];
+  const promptList = (typeof window !== 'undefined' && Array.isArray(window.prompts))
+    ? window.prompts
+    : ((typeof prompts !== 'undefined' && Array.isArray(prompts)) ? prompts : []);
+  const categoriesList = (typeof window !== 'undefined' && Array.isArray(window.CATEGORIES))
+    ? window.CATEGORIES
+    : ((typeof CATEGORIES !== 'undefined' && Array.isArray(CATEGORIES)) 
+      ? CATEGORIES 
+      : ['All', 'Wedding', 'Portrait', 'Couple', 'Birthday', 'Baby Photography', 'Traditional', 'Royal', 'Cinematic', 'Restoration', 'Passport', 'Festival', 'Other']);
 
   // ==========================================================================
   // DOM REFERENCES

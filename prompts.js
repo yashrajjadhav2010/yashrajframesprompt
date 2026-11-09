@@ -172,6 +172,10 @@ const CATEGORIES = [
 ];
 
 // Export for module systems or attach to window for static vanilla script tag
+if (typeof window !== "undefined") {
+  window.prompts = prompts;
+  window.CATEGORIES = CATEGORIES;
+}
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { prompts, CATEGORIES };
 }
