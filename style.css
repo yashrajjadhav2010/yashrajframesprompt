@@ -1,0 +1,1245 @@
+/* ==========================================================================
+   YASHRAJ FRAMES – AI STUDIO (PINTEREST EDITION)
+   Iconic Masonry Feed, Floating Pin Cards & Creative Workspace
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Pinterest-inspired Dark Studio Theme */
+  --bg-primary: #121212;
+  --bg-surface: #1e1e1e;
+  --bg-surface-hover: #2a2a2a;
+  --bg-surface-elevated: #333333;
+  --bg-pill: #2b2b2b;
+  --bg-pill-hover: #3a3a3a;
+  
+  --text-primary: #FFFFFF;
+  --text-secondary: #B0B0B0;
+  --text-muted: #767676;
+  
+  /* Pinterest Signature Accent + Champagne Luxury */
+  --accent-pinterest-red: #E60023;
+  --accent-pinterest-red-hover: #AD081B;
+  --accent-gold: #D6B879;
+  --accent-gold-hover: #E8D09E;
+  --accent-gold-dim: rgba(214, 184, 121, 0.15);
+  
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.14);
+  
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  --header-height: 80px;
+  --radius-pin: 16px;
+  --radius-modal: 32px;
+  --radius-pill: 9999px;
+  
+  --transition-snappy: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-smooth: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Reset & Base */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Custom Pinterest Smooth Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}
+
+/* Typography */
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
+   PINTEREST TOP HEADER (Sticky, centered pill search, action pills)
+   ========================================================================== */
+.pinterest-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: var(--header-height);
+  background-color: rgba(18, 18, 18, 0.95);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  gap: 16px;
+}
+
+/* Left Brand & Nav Pill Buttons */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.brand-monogram-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--accent-pinterest-red), #B00018);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.05em;
+  box-shadow: 0 4px 14px rgba(230, 0, 35, 0.35);
+  transition: transform var(--transition-snappy);
+  cursor: pointer;
+}
+
+.brand-monogram-btn:hover {
+  transform: scale(1.05);
+}
+
+.brand-text-lockup {
+  display: flex;
+  flex-direction: column;
+  margin-right: 12px;
+}
+
+.brand-name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.brand-studio-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent-gold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Pinterest Navigation Pill Links */
+.header-nav-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-pill {
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.94rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--transition-snappy);
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.header-pill:hover {
+  background-color: var(--bg-surface-hover);
+}
+
+.header-pill.active {
+  background-color: #FFFFFF;
+  color: #121212;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.header-pill.active svg {
+  color: #121212;
+}
+
+/* Center Large Pinterest Search Bar */
+.header-search-container {
+  flex: 1;
+  max-width: 860px;
+  position: relative;
+}
+
+.pinterest-search-box {
+  width: 100%;
+  height: 48px;
+  background-color: var(--bg-surface);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  padding: 0 46px 0 48px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  transition: all var(--transition-snappy);
+}
+
+.pinterest-search-box:focus {
+  outline: none;
+  background-color: #262626;
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 2px rgba(214, 184, 121, 0.25);
+}
+
+.search-magnifier-icon {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  width: 18px;
+  height: 18px;
+}
+
+.search-clear-cross {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: var(--bg-surface-elevated);
+  border: none;
+  color: var(--text-secondary);
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-snappy);
+}
+
+.search-clear-cross:hover {
+  background-color: #444;
+  color: #fff;
+}
+
+/* Right Actions */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.icon-btn-round {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-snappy);
+}
+
+.icon-btn-round:hover {
+  background-color: var(--bg-surface-hover);
+  transform: scale(1.05);
+}
+
+.icon-btn-round.active {
+  background-color: #FFFFFF;
+  color: #121212;
+}
+
+.round-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background-color: var(--accent-pinterest-red);
+  color: #FFFFFF;
+  font-size: 0.7rem;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-profile-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #2D333D, #1C2028);
+  border: 2px solid var(--accent-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--accent-gold);
+  cursor: pointer;
+  transition: transform var(--transition-snappy);
+}
+
+.user-profile-avatar:hover {
+  transform: scale(1.05);
+}
+
+/* ==========================================================================
+   PINTEREST CATEGORY PILLS BAR (Horizontal Carousel)
+   ========================================================================== */
+.pinterest-chips-bar {
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  background-color: var(--bg-primary);
+  position: sticky;
+  top: var(--header-height);
+  z-index: 90;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pinterest-chips-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.pinterest-chip {
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.88rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all var(--transition-snappy);
+}
+
+.pinterest-chip:hover {
+  background-color: var(--bg-surface-hover);
+}
+
+.pinterest-chip.active {
+  background-color: var(--text-primary);
+  color: #121212;
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   MAIN FEED & WORKSPACE CONTAINER
+   ========================================================================== */
+.pinterest-viewport {
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 24px 20px 80px 20px;
+}
+
+.view-section {
+  display: none;
+  animation: feedFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.view-section.active {
+  display: block;
+}
+
+@keyframes feedFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Section Header (Quiet Pinterest Title Bar) */
+.feed-header-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 0 8px;
+}
+
+.feed-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.feed-filter-info {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.feed-filter-info strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+/* ==========================================================================
+   PINTEREST MASONRY WATERFALL GRID
+   ========================================================================== */
+.pins-masonry {
+  column-count: 5;
+  column-gap: 18px;
+  width: 100%;
+}
+
+@media (max-width: 1600px) {
+  .pins-masonry {
+    column-count: 4;
+  }
+}
+
+@media (max-width: 1100px) {
+  .pins-masonry {
+    column-count: 3;
+    column-gap: 14px;
+  }
+}
+
+@media (max-width: 720px) {
+  .pins-masonry {
+    column-count: 2;
+    column-gap: 10px;
+  }
+}
+
+/* Pin Item Card */
+.pin-card {
+  break-inside: avoid;
+  margin-bottom: 22px;
+  display: inline-block;
+  width: 100%;
+  cursor: pointer;
+  position: relative;
+}
+
+/* Pin Image Wrapper */
+.pin-media-container {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-pin);
+  overflow: hidden;
+  background-color: var(--bg-surface);
+  transition: transform var(--transition-smooth), filter var(--transition-snappy);
+}
+
+.pin-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.25s ease;
+}
+
+.pin-card:hover .pin-image {
+  transform: scale(1.03);
+  filter: brightness(0.85);
+}
+
+/* Pinterest Card Hover Overlay & Buttons */
+.pin-hover-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.05) 50%, rgba(0, 0, 0, 0.6) 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-snappy);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px;
+  z-index: 10;
+}
+
+.pin-card:hover .pin-hover-scrim {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Top Right Signature Pinterest CTA: "Copy Prompt" */
+.pin-top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.btn-pinterest-save {
+  background-color: var(--accent-pinterest-red);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 10px 16px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: all var(--transition-snappy);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.btn-pinterest-save:hover {
+  background-color: var(--accent-pinterest-red-hover);
+  transform: scale(1.04);
+}
+
+.btn-pinterest-save.copied {
+  background-color: #10B981;
+}
+
+/* Bottom Actions on Hover */
+.pin-bottom-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pin-quick-pill {
+  background-color: rgba(255, 255, 255, 0.85);
+  color: #121212;
+  backdrop-filter: blur(8px);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  cursor: pointer;
+}
+
+.pin-quick-pill:hover {
+  background-color: #FFFFFF;
+}
+
+.pin-round-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pin-circle-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  color: #121212;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-snappy);
+}
+
+.pin-circle-btn:hover {
+  background-color: #FFFFFF;
+  transform: scale(1.1);
+}
+
+.pin-circle-btn.is-fav {
+  background-color: var(--accent-pinterest-red);
+  color: #FFFFFF;
+}
+
+/* Pin Card Metadata (Below image) */
+.pin-info-row {
+  padding: 8px 4px 0 4px;
+}
+
+.pin-title-text {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.pin-author-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pin-author-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--accent-gold);
+  flex-shrink: 0;
+}
+
+.pin-author-name {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   PINTEREST 2-COLUMN DETAIL FLOATING MODAL
+   ========================================================================== */
+.pinterest-modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(16px);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.pinterest-modal-backdrop.active {
+  display: flex;
+}
+
+.pinterest-modal-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-modal);
+  max-width: 1040px;
+  width: 100%;
+  max-height: 90vh;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  animation: modalPop 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  position: relative;
+}
+
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Modal Back / Close Floating Button */
+.modal-floating-close-btn {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background-color: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 30;
+  transition: all var(--transition-snappy);
+}
+
+.modal-floating-close-btn:hover {
+  background-color: rgba(0, 0, 0, 0.9);
+  transform: scale(1.08);
+}
+
+/* Modal Left: Big Pin Image Container */
+.modal-pin-visual-col {
+  background-color: #0F0F0F;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.modal-pin-img-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
+.modal-pin-img {
+  max-width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  transition: transform 0.25s ease-out;
+}
+
+.modal-pin-img.zoomed {
+  transform: scale(1.7);
+  cursor: grab;
+}
+
+.modal-img-bar {
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: rgba(0, 0, 0, 0.3);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Modal Right: Pin Content & Prompt */
+.modal-pin-details-col {
+  padding: 36px 36px 36px 32px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Pin Action Bar */
+.modal-top-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.modal-left-icons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-action-btn-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-surface-elevated);
+  border: none;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-snappy);
+}
+
+.modal-action-btn-circle:hover {
+  background-color: #444;
+}
+
+.modal-action-btn-circle.is-fav {
+  background-color: var(--accent-pinterest-red);
+  color: #FFFFFF;
+}
+
+.btn-pinterest-save-large {
+  background-color: var(--accent-pinterest-red);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 12px 26px;
+  font-weight: 700;
+  font-size: 0.98rem;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(230, 0, 35, 0.4);
+  transition: all var(--transition-snappy);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-pinterest-save-large:hover {
+  background-color: var(--accent-pinterest-red-hover);
+  transform: scale(1.02);
+}
+
+.btn-pinterest-save-large.copied {
+  background-color: #10B981;
+}
+
+/* Pin Headings & Meta */
+.modal-pin-title {
+  font-size: 1.85rem;
+  font-weight: 800;
+  line-height: 1.25;
+  margin-bottom: 12px;
+}
+
+.modal-creator-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.modal-creator-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #2A303C, #181C24);
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.modal-creator-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-creator-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.modal-creator-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.modal-pin-description {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+/* Pinterest Chips / Tags */
+.modal-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.modal-tag-pill {
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-surface-elevated);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-snappy);
+}
+
+.modal-tag-pill:hover {
+  background-color: #444;
+  color: #fff;
+}
+
+/* Prompt Box */
+.modal-prompt-card {
+  background-color: #121212;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-prompt-header {
+  padding: 10px 16px;
+  background-color: #181818;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  color: var(--accent-gold);
+  font-weight: 600;
+}
+
+.modal-prompt-body {
+  padding: 18px;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: #DDE2EB;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+  user-select: text;
+}
+
+/* ==========================================================================
+   PINTEREST BOARDS / COLLECTIONS VIEW
+   ========================================================================== */
+.boards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  margin-top: 16px;
+}
+
+@media (max-width: 1400px) {
+  .boards-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .boards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .boards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.board-card {
+  background-color: var(--bg-surface);
+  border-radius: 20px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform var(--transition-snappy);
+}
+
+.board-card:hover {
+  transform: translateY(-4px);
+}
+
+.board-collage-cover {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2px;
+  background-color: #121212;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+.board-main-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.board-sub-thumbs {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+}
+
+.board-sub-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.board-meta {
+  padding: 14px 8px 10px 8px;
+}
+
+.board-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.board-stats {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   PINTEREST PROFILE / SAVED HEADER
+   ========================================================================== */
+.profile-saved-header {
+  text-align: center;
+  padding: 36px 20px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.profile-large-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #2D333D, #1C2028);
+  border: 3px solid var(--accent-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2.2rem;
+  color: var(--accent-gold);
+  margin-bottom: 16px;
+}
+
+.profile-name {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.profile-handle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 18px;
+}
+
+.profile-sub-tabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.profile-tab-btn {
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: 0.92rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-snappy);
+}
+
+.profile-tab-btn:hover {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.profile-tab-btn.active {
+  background-color: #FFFFFF;
+  color: #121212;
+}
+
+/* ==========================================================================
+   EMPTY STATE FOR PINS
+   ========================================================================== */
+.pinterest-empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-state-bubble {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-gold);
+  margin-bottom: 20px;
+}
+
+.empty-state-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.empty-state-desc {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  max-width: 440px;
+  margin-bottom: 24px;
+}
+
+/* ==========================================================================
+   TOAST NOTIFICATION (Pinterest Styled Pill)
+   ========================================================================== */
+.toast-container {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  background-color: #FFFFFF;
+  color: #121212;
+  font-weight: 700;
+  font-size: 0.92rem;
+  padding: 12px 24px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: toastPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.toast svg {
+  color: var(--accent-pinterest-red);
+  width: 18px;
+  height: 18px;
+}
+
+@keyframes toastPop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ==========================================================================
+   MOBILE BOTTOM BAR (Pinterest Iconic Mobile Nav)
+   ========================================================================== */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background-color: rgba(18, 18, 18, 0.96);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border-subtle);
+  z-index: 100;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 12px;
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  gap: 3px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+}
+
+.mobile-nav-item.active {
+  color: #FFFFFF;
+}
+
+.mobile-nav-item.active svg {
+  color: var(--accent-pinterest-red);
+}
+
+@media (max-width: 900px) {
+  .header-nav-pills {
+    display: none;
+  }
+  .brand-text-lockup {
+    display: none;
+  }
+  .pinterest-modal-card {
+    grid-template-columns: 1fr;
+    max-height: 94vh;
+    border-radius: 20px;
+  }
+  .modal-pin-visual-col {
+    max-height: 45vh;
+  }
+  .mobile-bottom-nav {
+    display: flex;
+  }
+  .pinterest-viewport {
+    padding-bottom: 90px;
+  }
+}

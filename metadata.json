@@ -1,0 +1,6 @@
+{
+  "name": "YASHRAJ FRAMES – AI STUDIO",
+  "description": "A premium creative technology workspace and AI photo-editing prompt library with visual references for professional photography and framing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
