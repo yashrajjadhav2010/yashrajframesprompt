@@ -134,8 +134,8 @@ const prompts = [
   title: "Queen of Beauty Editorial Collage",
   category: "Editorial Portrait",
   description: "Aesthetic circular mosaic framing, elegant emerald green gown styling, and romantic typographic accents.",
-  thumbnail: "assets/prompts/14.jpg",
-  referenceImage: "assets/prompts/14.jpeg",
+  thumbnail: "assets/prompts/14.jpeg",
+  referenceImage: "assets/prompts/14.jpg",
   prompt: `A high-end, romantic editorial collage poster design on a clean off-white background adorned with floating pink butterflies, red hearts, and a daisy flower accent. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes. The background features a large curved arc arrangement containing multiple stacked black-and-white portraits showcasing different expressive close-ups of the exact same subject. In the foreground, a vibrant full-color cutout of the same subject wearing an elegant long dark-green heavily embroidered gown. In the central circle and surrounding areas, stylish script typography reads "Queen of Beauty" and "I Love you", with the name "Divya" in a large cursive font at the bottom alongside the phrase "Capture the moment" and a heartbeat line icon. High-end fashion editorial photography, soft lighting, absolute face consistency.`,
   featured: false,
   tags: ["Editorial", "Fashion", "Portrait", "Collage"]
@@ -145,12 +145,68 @@ const prompts = [
   title: "Cinematic Heritage Birthday Poster",
   category: "Birthday",
   description: "Dramatic triple-panel vertical split layout, moody crimson historic monument background, and elegant handwritten birthday typography.",
-  thumbnail: "assets/prompts/15.jpg",
-  referenceImage: "assets/prompts/15.jpeg",
+  thumbnail: "assets/prompts/15.jpeg",
+  referenceImage: "assets/prompts/15.jpg",
   prompt: `A cinematic vertical triple-panel poster design[cite: 15]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[cite: 15]. The left and right side panels feature large, high-contrast monochrome (black-and-white) close-up side profiles of the exact same subject smiling[cite: 15]. The center panel features a deep crimson-red and dark moody background displaying an ancient historic stone pavilion and steps at twilight[cite: 15]. In the center foreground, a full-length portrait of the subject wearing an elegant light-colored traditional lehenga with sheer dupatta and earrings[cite: 15]. At the top of the central panel, elegant golden cursive typography reads "Happy Birthday"[cite: 15]. Hyperrealistic photography, dramatic lighting, absolute face consistency[cite: 15].`,
   featured: false,
   tags: ["Birthday", "Cinematic", "Portrait", "Editorial"]
+},
+{
+  id: 14,
+  title: "Cinematic Double-Exposure Editorial Portrait",
+  category: "Editorial Portrait",
+  description: "Moody dark background, striking double-exposure profile overlays, and casual stylish streetwear fashion framing.",
+  thumbnail: "assets/prompts/16.jpg",
+  referenceImage: "assets/prompts/16.jpg",
+  prompt: `A cinematic, moody double-exposure portrait poster design on a dark, textured charcoal-black background[cite: 16]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[cite: 16]. The background features large, semi-transparent double-exposure side-profile portraits of the exact same subject—one side showing a smiling profile and the other wearing dark sunglasses[cite: 16]. In the foreground center, a full-length portrait of the subject walking forward, wearing an unbuttoned teal-green overshirt over a white tank top, dark cargo pants, and white sneakers, with hands casually in pockets[cite: 16]. Dramatic studio spotlighting, cinematic depth of field, absolute face consistency[cite: 16].`,
+  featured: false,
+  tags: ["Editorial", "Streetwear", "Portrait", "Cinematic"]
+},
+{
+  id: 15,
+  title: "Minimalist Elegance Birthday Collage",
+  category: "Birthday",
+  description: "Sophisticated sunlit aesthetic, stacked rounded photo frames, crisp white linen attire, and golden typography accents.",
+  thumbnail: "assets/prompts/17.jpg",
+  referenceImage: "assets/prompts/17.jpg",
+  prompt: `A bright, minimalist birthday poster design on a clean, sun-dappled off-white background with subtle leaf shadows and gold border accents[cite: 17]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[cite: 17]. On the left side, a full-length standing portrait of the subject wearing a white button-down linen shirt, beige trousers, clear glasses, and brown leather loafers, casually holding sunglasses[cite: 17]. On the right side, a stacked column of three white-bordered rounded rectangular panels displaying different close-up portraits of the exact same subject in various expressions and eyewear[cite: 17]. At the bottom right, elegant typography reads "H A P P Y" above a flowing gold script "Birthday", with subtitle text reading "KEEP SHINING" accompanied by a tiny crown icon[cite: 17]. High-end fashion editorial look, soft natural lighting, absolute face consistency[cite: 17].`,
+  featured: false,
+  tags: ["Birthday", "Minimalist", "Portrait", "Editorial"]
+},
+{
+  id: 16,
+  title: "Arch Mosaic Birthday Poster",
+  category: "Birthday",
+  description: "Aesthetic semi-circular arched frame mosaic, elegant dark green overshirt styling, and custom typography accents.",
+  thumbnail: "assets/prompts/18.jpg",
+  referenceImage: "assets/prompts/18.jpg",
+  prompt: `A stylish, modern birthday poster design on a clean light-grey studio background[cite: 18]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[cite: 18]. The background features a large semi-circular arched mosaic containing multiple black-and-white panels showing different candid portraits and poses of the exact same subject wearing a cap and sunglasses[cite: 18]. In the foreground center, a full-length portrait of the subject wearing an unbuttoned dark green overshirt, white pants, a wristwatch, and white sneakers[cite: 18]. On the left and right sides, sleek typography reads "Happy BIRTHDAY" and "Mr. Professor" with a crown graphic, accompanied by inspirational subtitle blocks[cite: 18]. Professional editorial styling, clean lighting, absolute face consistency[cite: 18].`,
+  featured: false,
+  tags: ["Birthday", "Editorial", "Portrait", "Collage"]
+},
+{
+  id: 17,
+  title: "Executive Double-Exposure Birthday Poster",
+  category: "Birthday",
+  description: "Sophisticated corporate aesthetic with layered executive portraiture, plush armchair seating, and bold purple typography.",
+  thumbnail: "assets/prompts/19.jpg",
+  referenceImage: "assets/prompts/19.jpg",
+  prompt: `An executive birthday poster on a light off-white background with subtle background graphics. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes. In the foreground, the subject sits cross-legged in a stylish formal suit and loafers on a plush orange armchair. Blended into the background are two larger double-exposure portraits of the exact same subject—one smiling close-up and one waist-up figure clapping. At the top, bold purple script reads "HAPPY Birthday" above clean custom text for the name and date. Professional studio lighting, executive styling, absolute face consistency.`,
+  featured: false,
+  tags: ["Birthday", "Executive", "Portrait", "Corporate"]
+},
+{
+  id: 18,
+  title: "Bold Typographic Birthday Poster",
+  category: "Birthday",
+  description: "High-contrast dark aesthetic with massive red block typography, casual oversized shirt styling, and handwritten script accents.",
+  thumbnail: "assets/prompts/20.jpg",
+  referenceImage: "assets/prompts/20.jpg",
+  prompt: `A bold and modern typographic birthday poster design on a solid dark black background[cite: 16]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[cite: 16]. In the upper background, massive bold red sans-serif block lettering spells out "HAPPY BIRTHDAY"[cite: 16]. In the center foreground, a full-length portrait of the subject standing casually in an oversized white shirt with rolled sleeves, blue loose-fit jeans, and white sneakers[cite: 16]. Below the main heading, white handwritten script typography reads "to my" on the left and "little brother" on the right[cite: 16]. High-contrast studio lighting, sharp editorial framing, absolute face consistency[cite: 16].`,
+  featured: false,
+  tags: ["Birthday", "Typographic", "Minimalist", "Editorial"]
 }
+
 ];
 
 // Helper to get all categories
@@ -172,10 +228,6 @@ const CATEGORIES = [
 ];
 
 // Export for module systems or attach to window for static vanilla script tag
-if (typeof window !== "undefined") {
-  window.prompts = prompts;
-  window.CATEGORIES = CATEGORIES;
-}
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { prompts, CATEGORIES };
 }
