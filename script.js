@@ -4,6 +4,8 @@
  * Vanilla JavaScript Architecture
  */
 
+import { prompts as importedPrompts, CATEGORIES as importedCategories } from './prompts.js';
+
 (function () {
   'use strict';
 
@@ -89,14 +91,17 @@
     }
   };
 
-  const promptList = (typeof window !== 'undefined' && Array.isArray(window.prompts))
-    ? window.prompts
-    : ((typeof prompts !== 'undefined' && Array.isArray(prompts)) ? prompts : []);
-  const categoriesList = (typeof window !== 'undefined' && Array.isArray(window.CATEGORIES))
-    ? window.CATEGORIES
-    : ((typeof CATEGORIES !== 'undefined' && Array.isArray(CATEGORIES)) 
-      ? CATEGORIES 
-      : ['All', 'Wedding', 'Portrait', 'Couple', 'Birthday', 'Baby Photography', 'Traditional', 'Royal', 'Cinematic', 'Restoration', 'Passport', 'Festival', 'Other']);
+  const promptList = (Array.isArray(importedPrompts) && importedPrompts.length > 0)
+    ? importedPrompts
+    : ((typeof window !== 'undefined' && Array.isArray(window.prompts) && window.prompts.length > 0)
+      ? window.prompts
+      : ((typeof prompts !== 'undefined' && Array.isArray(prompts)) ? prompts : []));
+
+  const categoriesList = (Array.isArray(importedCategories) && importedCategories.length > 0)
+    ? importedCategories
+    : ((typeof window !== 'undefined' && Array.isArray(window.CATEGORIES) && window.CATEGORIES.length > 0)
+      ? window.CATEGORIES
+      : ['All', 'Wedding', 'Portrait', 'Couple', 'Birthday', 'Baby Photography', 'Traditional', 'Royal', 'Cinematic', 'Restoration', 'Passport', 'Festival', 'Editorial Portrait', 'Other']);
 
   function getAllPrompts() {
     return [...state.customStyles, ...promptList];
