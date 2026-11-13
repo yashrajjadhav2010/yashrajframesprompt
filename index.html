@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>YASHRAJ FRAMES – AI STUDIO</title>
     <meta name="description" content="Pinterest-style AI photo-editing prompt library and visual workspace for Yashraj Frames." />
     <meta property="og:title" content="YASHRAJ FRAMES – AI STUDIO" />
@@ -158,6 +158,31 @@
         <polyline points="7 10 12 15 17 10"/>
         <line x1="12" x2="12" y1="15" y2="3"/>
       </symbol>
+      <symbol id="icon-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="5" height="5" x="3" y="3" rx="1"/>
+        <rect width="5" height="5" x="16" y="3" rx="1"/>
+        <rect width="5" height="5" x="3" y="16" rx="1"/>
+        <path d="M21 16h-3a2 2 0 0 0-2 2v3"/>
+        <path d="M21 21v.01"/>
+        <path d="M12 7v3a2 2 0 0 1-2 2H7"/>
+        <path d="M3 12h.01"/>
+        <path d="M12 3h.01"/>
+        <path d="M12 16v.01"/>
+        <path d="M16 12h1"/>
+        <path d="M21 12v.01"/>
+        <path d="M12 21v-1"/>
+      </symbol>
+      <symbol id="icon-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+      </symbol>
+      <symbol id="icon-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="20" height="16" x="2" y="4" rx="2"/>
+        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+      </symbol>
+      <symbol id="icon-map-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </symbol>
     </svg>
 
     <!-- PINTEREST TOP BAR -->
@@ -243,6 +268,10 @@
         <button class="icon-btn-round" data-view="saved" title="Saved Favorites" id="btnHeaderSaved">
           <svg style="width: 20px; height: 20px;"><use href="#icon-heart"></use></svg>
           <span class="round-badge" id="badge-saved-count" style="display: none;">0</span>
+        </button>
+        <button class="icon-btn-round mobile-tools-trigger-btn" id="btnMobileToolsTrigger" title="Studio Tools &amp; Shop Menu" aria-label="Open Studio Tools &amp; Shop Menu">
+          <svg style="width: 20px; height: 20px;"><use href="#icon-sliders"></use></svg>
+          <span class="round-badge" id="badge-mobile-tools" style="display: none;">0</span>
         </button>
         <div class="user-profile-avatar" data-view="saved" title="Studio Profile">
           YF
@@ -762,12 +791,30 @@
           </div>
 
           <!-- More Like This Hint -->
-          <div style="margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted);">
+          <div class="modal-verified-footer-row" style="margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted);">
             <span>Yashraj Frames AI Studio Production Preset</span>
             <span style="color: var(--accent-gold); font-weight: 600;">Verified Prompt</span>
           </div>
         </div>
+
+        <!-- Mobile Sticky Thumb Action Dock inside Pin Modal -->
+        <div class="mobile-modal-sticky-dock" id="mobileModalStickyDock">
+          <button type="button" class="mob-dock-btn mob-dock-frame" id="btnMobModalFrame">
+            <svg style="width: 17px; height: 17px;"><use href="#icon-frame"></use></svg>
+            <span>Frame</span>
+          </button>
+          <button type="button" class="mob-dock-btn mob-dock-ai" id="btnMobModalAutoTake">
+            <svg style="width: 17px; height: 17px;"><use href="#icon-sparkles"></use></svg>
+            <span>AI Take</span>
+          </button>
+          <button type="button" class="mob-dock-btn mob-dock-copy" id="btnMobModalCopyPrompt">
+            <svg style="width: 17px; height: 17px;"><use href="#icon-copy"></use></svg>
+            <span id="lblMobModalCopy">Copy</span>
+          </button>
+        </div>
       </div>
+    </div>
+
     <!-- AI AUTO TAKE LAUNCHER MODAL -->
     <div class="pinterest-modal-backdrop" id="aiAutoTakeModal" role="dialog" aria-modal="true">
       <div class="ai-launcher-card">
@@ -783,7 +830,7 @@
 
         <div class="ai-launcher-body">
           <h2 class="ai-launcher-title">Send Prompt Directly to AI</h2>
-          <p class="ai-launcher-desc">Choose which AI app to launch. We will automatically copy the full prompt and open your AI app with the prompt preloaded, completely removing manual copy-paste.</p>
+          <p class="ai-launcher-desc">Choose your AI tool below. We copy the clean prompt to your clipboard AND pass it in the URL to desktop AI websites that support auto-fill.</p>
           
           <div class="ai-prompt-preview" id="aiLauncherPromptPreview">
             <!-- Populated dynamically -->
@@ -797,10 +844,26 @@
               </div>
               <div class="ai-target-info">
                 <div class="ai-target-name-row">
-                  <span class="ai-target-name">ChatGPT (GPT-4o)</span>
-                  <span class="ai-target-badge badge-recommended">Auto-Fills Prompt</span>
+                  <span class="ai-target-name">ChatGPT Web</span>
+                  <span class="ai-target-badge badge-recommended">URL Auto-Fill + Copy</span>
                 </div>
-                <span class="ai-target-desc">Opens ChatGPT with this prompt already prefilled in the message box</span>
+                <span class="ai-target-desc">Opens ChatGPT with ?q= prompt prefilled (plus clipboard ready for Ctrl+V)</span>
+              </div>
+              <div class="ai-target-arrow">
+                <svg style="width: 14px; height: 14px; transform: rotate(180deg);"><use href="#icon-arrow-left"></use></svg>
+              </div>
+            </button>
+
+            <button type="button" class="ai-target-btn" data-target="claude">
+              <div class="ai-target-icon bg-claude">
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+              </div>
+              <div class="ai-target-info">
+                <div class="ai-target-name-row">
+                  <span class="ai-target-name">Claude Web</span>
+                  <span class="ai-target-badge badge-recommended">Auto-Fills Box</span>
+                </div>
+                <span class="ai-target-desc">Opens claude.ai/new with the prompt pre-typed so you can attach client photo</span>
               </div>
               <div class="ai-target-arrow">
                 <svg style="width: 14px; height: 14px; transform: rotate(180deg);"><use href="#icon-arrow-left"></use></svg>
@@ -814,25 +877,25 @@
               <div class="ai-target-info">
                 <div class="ai-target-name-row">
                   <span class="ai-target-name">Bing Image Creator</span>
-                  <span class="ai-target-badge">Direct DALL-E 3</span>
+                  <span class="ai-target-badge">Auto-Fills Prompt</span>
                 </div>
-                <span class="ai-target-desc">Preloads prompt directly into Microsoft Designer image generator</span>
+                <span class="ai-target-desc">Preloads prompt directly into Microsoft Designer / DALL-E 3 generator</span>
               </div>
               <div class="ai-target-arrow">
                 <svg style="width: 14px; height: 14px; transform: rotate(180deg);"><use href="#icon-arrow-left"></use></svg>
               </div>
             </button>
 
-            <button type="button" class="ai-target-btn" data-target="gemini">
-              <div class="ai-target-icon bg-gemini">
-                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V17a1 1 0 0 1-2 0v-.07A6 6 0 0 1 6.07 12H6a1 1 0 0 1 0-2h.07A6 6 0 0 1 11 5.07V5a1 1 0 0 1 2 0v.07A6 6 0 0 1 17.93 10H18a1 1 0 0 1 0 2h-.07A6 6 0 0 1 13 16.93z"/></svg>
+            <button type="button" class="ai-target-btn" data-target="grok">
+              <div class="ai-target-icon bg-grok">
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
               </div>
               <div class="ai-target-info">
                 <div class="ai-target-name-row">
-                  <span class="ai-target-name">Google Gemini</span>
-                  <span class="ai-target-badge">Copies & Launches</span>
+                  <span class="ai-target-name">Grok Web (Aurora)</span>
+                  <span class="ai-target-badge">URL Auto-Fill</span>
                 </div>
-                <span class="ai-target-desc">Copies complete prompt to clipboard and opens Google Gemini</span>
+                <span class="ai-target-desc">Opens grok.com with your prompt directly populated via query parameter</span>
               </div>
               <div class="ai-target-arrow">
                 <svg style="width: 14px; height: 14px; transform: rotate(180deg);"><use href="#icon-arrow-left"></use></svg>
@@ -846,9 +909,41 @@
               <div class="ai-target-info">
                 <div class="ai-target-name-row">
                   <span class="ai-target-name">Perplexity AI</span>
-                  <span class="ai-target-badge">Auto-Fills Query</span>
+                  <span class="ai-target-badge">Auto-Fills Search</span>
                 </div>
-                <span class="ai-target-desc">Opens Perplexity AI with the prompt pre-loaded in the search bar</span>
+                <span class="ai-target-desc">Opens perplexity.ai/search with the prompt loaded immediately</span>
+              </div>
+              <div class="ai-target-arrow">
+                <svg style="width: 14px; height: 14px; transform: rotate(180deg);"><use href="#icon-arrow-left"></use></svg>
+              </div>
+            </button>
+
+            <button type="button" class="ai-target-btn" data-target="gemini">
+              <div class="ai-target-icon bg-gemini">
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V17a1 1 0 0 1-2 0v-.07A6 6 0 0 1 6.07 12H6a1 1 0 0 1 0-2h.07A6 6 0 0 1 11 5.07V5a1 1 0 0 1 2 0v.07A6 6 0 0 1 17.93 10H18a1 1 0 0 1 0 2h-.07A6 6 0 0 1 13 16.93z"/></svg>
+              </div>
+              <div class="ai-target-info">
+                <div class="ai-target-name-row">
+                  <span class="ai-target-name">Google Gemini Web</span>
+                  <span class="ai-target-badge">Auto-Copy · Ctrl+V</span>
+                </div>
+                <span class="ai-target-desc">Copies prompt &amp; opens Gemini Web (Google blocks URL auto-fill; press Ctrl+V to paste)</span>
+              </div>
+              <div class="ai-target-arrow">
+                <svg style="width: 14px; height: 14px; transform: rotate(180deg);"><use href="#icon-arrow-left"></use></svg>
+              </div>
+            </button>
+
+            <button type="button" class="ai-target-btn" data-target="copilot">
+              <div class="ai-target-icon bg-copilot">
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+              </div>
+              <div class="ai-target-info">
+                <div class="ai-target-name-row">
+                  <span class="ai-target-name">Microsoft Copilot</span>
+                  <span class="ai-target-badge">URL Query + Copy</span>
+                </div>
+                <span class="ai-target-desc">Opens copilot.microsoft.com with prompt query &amp; clipboard ready</span>
               </div>
               <div class="ai-target-arrow">
                 <svg style="width: 14px; height: 14px; transform: rotate(180deg);"><use href="#icon-arrow-left"></use></svg>
@@ -862,7 +957,7 @@
               <div class="ai-target-info">
                 <div class="ai-target-name-row">
                   <span class="ai-target-name">Send to Installed App (Mobile / OS)</span>
-                  <span class="ai-target-badge">Share Direct</span>
+                  <span class="ai-target-badge">Mobile Only</span>
                 </div>
                 <span class="ai-target-desc">Open directly in ChatGPT, Gemini, or any photo app on your phone</span>
               </div>
@@ -883,6 +978,8 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
     <!-- SHOP CUSTOMER JOB SLIP & WHATSAPP QUOTATION MODAL -->
     <div class="pinterest-modal-backdrop" id="shopJobSlipModal" role="dialog" aria-modal="true">
       <div class="job-slip-modal-card">
@@ -950,6 +1047,65 @@
             </div>
           </form>
 
+          <!-- Collapsible Studio Contact Profile (Embedded inside Client QR Receipt) -->
+          <details class="slip-contact-details">
+            <summary class="slip-contact-summary">
+              <span class="slip-contact-summary-left">
+                <svg style="width: 15px; height: 15px; color: var(--accent-gold);"><use href="#icon-phone"></use></svg>
+                <span>Shop Contact Info Embedded in QR Pass</span>
+              </span>
+              <span class="slip-contact-edit-hint">Edit</span>
+            </summary>
+            <div class="job-slip-form-grid" style="margin-top: 12px;">
+              <div class="slip-form-group">
+                <label for="txtShopPhone">Studio Phone / WhatsApp</label>
+                <input type="tel" id="txtShopPhone" class="slip-input" placeholder="e.g. +91 98765 43210" />
+              </div>
+              <div class="slip-form-group">
+                <label for="txtShopEmail">Studio Email</label>
+                <input type="email" id="txtShopEmail" class="slip-input" value="yashrajart1999@gmail.com" />
+              </div>
+              <div class="slip-form-group">
+                <label for="txtShopHours">Studio Hours</label>
+                <input type="text" id="txtShopHours" class="slip-input" value="Mon–Sat, 10:00 AM – 8:30 PM" />
+              </div>
+              <div class="slip-form-group">
+                <label for="txtShopAddress">Shop Address / Landmark</label>
+                <input type="text" id="txtShopAddress" class="slip-input" placeholder="e.g. Yashraj Frames Gallery, Main Market" />
+              </div>
+            </div>
+          </details>
+
+          <!-- Digital Order QR Code Card (Client Scannable Receipt + Contact Page) -->
+          <div class="slip-qr-card" id="slipQrCard">
+            <div class="slip-qr-canvas-frame">
+              <canvas id="jobSlipQrCanvas" width="144" height="144" aria-label="Order Digital Receipt QR Code"></canvas>
+            </div>
+            <div class="slip-qr-info">
+              <div class="slip-qr-title-row">
+                <svg style="width: 15px; height: 15px; color: var(--accent-gold);"><use href="#icon-qr"></use></svg>
+                <span>Client Scan-to-Track QR Pass</span>
+              </div>
+              <p class="slip-qr-desc">
+                Clients can scan this QR code on their phone to open a digital copy of their order receipt, live specs, and Yashraj Frames contact buttons. Included automatically when printing!
+              </p>
+              <div class="slip-qr-actions">
+                <button type="button" class="btn-qr-action" id="btnPreviewDigitalReceipt">
+                  <svg style="width: 14px; height: 14px;"><use href="#icon-eye"></use></svg>
+                  <span>Preview Receipt</span>
+                </button>
+                <button type="button" class="btn-qr-action" id="btnCopySlipLink">
+                  <svg style="width: 14px; height: 14px;"><use href="#icon-copy"></use></svg>
+                  <span id="lblCopySlipLink">Copy Link</span>
+                </button>
+                <button type="button" class="btn-qr-action" id="btnDownloadSlipQr">
+                  <svg style="width: 14px; height: 14px;"><use href="#icon-download"></use></svg>
+                  <span>Save QR</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- WhatsApp Formatted Message Preview Box -->
           <div class="slip-preview-container">
             <div class="slip-preview-header">
@@ -980,10 +1136,10 @@
 
     <!-- PRESET STYLE PICKER MODAL (For Fast Selection inside Framing Studio) -->
     <div class="pinterest-modal-backdrop" id="presetPickerModal">
-      <button class="modal-floating-close-btn" id="presetPickerCloseBtn" aria-label="Close Preset Picker">
-        <svg style="width: 22px; height: 22px;"><use href="#icon-close"></use></svg>
-      </button>
-      <div class="preset-picker-card" role="dialog" aria-modal="true" aria-labelledby="presetPickerTitle">
+      <div class="preset-picker-card" role="dialog" aria-modal="true" aria-labelledby="presetPickerTitle" style="position: relative;">
+        <button class="modal-floating-close-btn modal-card-corner-close" id="presetPickerCloseBtn" aria-label="Close Preset Picker">
+          <svg style="width: 20px; height: 20px;"><use href="#icon-close"></use></svg>
+        </button>
         <div class="preset-picker-header">
           <div>
             <h3 class="preset-picker-title" id="presetPickerTitle">Choose Studio Preset Artwork</h3>
@@ -1002,10 +1158,10 @@
 
     <!-- ADD CUSTOM STYLE / PROMPT MODAL -->
     <div class="pinterest-modal-backdrop" id="addStyleModal">
-      <button class="modal-floating-close-btn" id="addStyleCloseBtn" aria-label="Close Add Style Modal">
-        <svg style="width: 22px; height: 22px;"><use href="#icon-close"></use></svg>
-      </button>
-      <div class="shop-job-slip-card" role="dialog" aria-modal="true" aria-labelledby="addStyleModalTitle">
+      <div class="shop-job-slip-card" role="dialog" aria-modal="true" aria-labelledby="addStyleModalTitle" style="position: relative;">
+        <button class="modal-floating-close-btn modal-card-corner-close" id="addStyleCloseBtn" aria-label="Close Add Style Modal">
+          <svg style="width: 20px; height: 20px;"><use href="#icon-close"></use></svg>
+        </button>
         <div class="slip-header-brand">
           <div class="slip-logo-group">
             <div class="slip-brand-icon">
@@ -1105,10 +1261,10 @@
 
     <!-- SHOP ORDERS & JOB SLIPS TRACKER MODAL -->
     <div class="pinterest-modal-backdrop" id="shopOrdersModal">
-      <button class="modal-floating-close-btn" id="shopOrdersCloseBtn" aria-label="Close Shop Orders Tracker">
-        <svg style="width: 22px; height: 22px;"><use href="#icon-close"></use></svg>
-      </button>
-      <div class="shop-orders-card" role="dialog" aria-modal="true" aria-labelledby="shopOrdersTitle">
+      <div class="shop-orders-card" role="dialog" aria-modal="true" aria-labelledby="shopOrdersTitle" style="position: relative;">
+        <button class="modal-floating-close-btn modal-card-corner-close" id="shopOrdersCloseBtn" aria-label="Close Shop Orders Tracker">
+          <svg style="width: 20px; height: 20px;"><use href="#icon-close"></use></svg>
+        </button>
         <div class="shop-orders-header">
           <div>
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -1155,6 +1311,205 @@
       </button>
       <img id="lightboxImg" style="max-width: 92vw; max-height: 90vh; object-fit: contain; border-radius: 16px;" src="" alt="Fullscreen Lightbox Pin" referrerPolicy="no-referrer" />
     </div>
+
+    <!-- MOBILE STUDIO TOOLS BOTTOM SHEET -->
+    <div class="pinterest-modal-backdrop mobile-sheet-backdrop" id="mobileToolsSheet" role="dialog" aria-modal="true" aria-labelledby="mobToolsTitle">
+      <div class="mobile-bottom-sheet-card">
+        <div class="mobile-sheet-drag-bar" id="mobSheetDragClose"></div>
+        <div class="mobile-sheet-header">
+          <div>
+            <h2 class="mobile-sheet-title" id="mobToolsTitle">Studio Tools &amp; Shop Menu</h2>
+            <p class="mobile-sheet-sub">Yashraj Frames · Quick Mobile Controls</p>
+          </div>
+          <button type="button" class="modal-floating-close-btn" id="mobToolsCloseBtn" style="position: static; width: 38px; height: 38px;" aria-label="Close Studio Tools">
+            <svg style="width: 16px; height: 16px;"><use href="#icon-close"></use></svg>
+          </button>
+        </div>
+
+        <div class="mobile-sheet-actions-list">
+          <button type="button" class="mobile-sheet-action-row" id="mobSheetAiTarget">
+            <div class="mobile-sheet-icon icon-gold">
+              <svg style="width: 18px; height: 18px;"><use href="#icon-sparkles"></use></svg>
+            </div>
+            <div class="mobile-sheet-row-text">
+              <span class="mobile-sheet-row-title">AI Auto Take Target</span>
+              <span class="mobile-sheet-row-sub" id="mobSheetAiLabel">AI: Auto</span>
+            </div>
+            <span class="mobile-sheet-row-meta">Change</span>
+          </button>
+
+          <button type="button" class="mobile-sheet-action-row" id="mobSheetShowroomMode">
+            <div class="mobile-sheet-icon icon-neutral">
+              <svg style="width: 18px; height: 18px;"><use href="#icon-eye"></use></svg>
+            </div>
+            <div class="mobile-sheet-row-text">
+              <span class="mobile-sheet-row-title">Customer Showroom Mode</span>
+              <span class="mobile-sheet-row-sub">Hide prompts while showing phone to clients</span>
+            </div>
+            <span class="mobile-sheet-status-text" id="mobSheetShowroomBadge">Off</span>
+          </button>
+
+          <button type="button" class="mobile-sheet-action-row" id="mobSheetShopOrders">
+            <div class="mobile-sheet-icon icon-green">
+              <svg style="width: 18px; height: 18px;"><use href="#icon-orders"></use></svg>
+            </div>
+            <div class="mobile-sheet-row-text">
+              <span class="mobile-sheet-row-title">Shop Orders &amp; Job Slips</span>
+              <span class="mobile-sheet-row-sub">Track framing jobs &amp; send WhatsApp alerts</span>
+            </div>
+            <span class="mobile-sheet-count" id="mobSheetOrdersCount">0</span>
+          </button>
+
+          <button type="button" class="mobile-sheet-action-row" id="mobSheetAddStyle">
+            <div class="mobile-sheet-icon icon-gold">
+              <svg style="width: 18px; height: 18px;"><use href="#icon-plus"></use></svg>
+            </div>
+            <div class="mobile-sheet-row-text">
+              <span class="mobile-sheet-row-title">Add Custom Style &amp; Prompt</span>
+              <span class="mobile-sheet-row-sub">Save your own shop preset or JSON backup</span>
+            </div>
+            <span class="mobile-sheet-row-meta">New</span>
+          </button>
+
+          <button type="button" class="mobile-sheet-action-row" id="mobSheetHistory">
+            <div class="mobile-sheet-icon icon-neutral">
+              <svg style="width: 18px; height: 18px;"><use href="#icon-clock"></use></svg>
+            </div>
+            <div class="mobile-sheet-row-text">
+              <span class="mobile-sheet-row-title">Recently Used Prompts</span>
+              <span class="mobile-sheet-row-sub">Quick trail of copied and inspected styles</span>
+            </div>
+            <span class="mobile-sheet-count" id="mobSheetRecentCount">0</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENT DIGITAL ORDER RECEIPT & CONTACT PORTAL (Opened via QR Scan) -->
+    <section class="client-receipt-portal" id="clientReceiptPortal" aria-label="Digital Order Receipt and Studio Contact Page" style="display: none;">
+      <div class="receipt-portal-shell">
+        <div class="receipt-portal-brand-bar">
+          <div class="receipt-brand-lockup">
+            <div class="receipt-monogram">YF</div>
+            <div>
+              <h1 class="receipt-brand-name">Yashraj Frames</h1>
+              <p class="receipt-brand-sub">Official Digital Order Copy &amp; Studio Contact</p>
+            </div>
+          </div>
+          <span class="receipt-status-pill" id="receiptPortalStatus">In Workshop</span>
+        </div>
+
+        <div class="receipt-order-banner">
+          <div>
+            <span class="receipt-meta-label">Order Reference</span>
+            <strong class="receipt-order-num" id="receiptPortalOrderNum">#YF-2026-000</strong>
+          </div>
+          <div style="text-align: right;">
+            <span class="receipt-meta-label">Order Date</span>
+            <strong class="receipt-order-date" id="receiptPortalDate">—</strong>
+          </div>
+        </div>
+
+        <div class="receipt-details-card">
+          <h2 class="receipt-section-heading">Order &amp; Framing Specifications</h2>
+          <div class="receipt-spec-list">
+            <div class="receipt-spec-row">
+              <span class="receipt-spec-key">Customer</span>
+              <span class="receipt-spec-val" id="receiptPortalCustomer">—</span>
+            </div>
+            <div class="receipt-spec-row">
+              <span class="receipt-spec-key">Artwork Style</span>
+              <span class="receipt-spec-val" id="receiptPortalStyle">—</span>
+            </div>
+            <div class="receipt-spec-row">
+              <span class="receipt-spec-key">Frame &amp; Moulding</span>
+              <span class="receipt-spec-val" id="receiptPortalFrame">—</span>
+            </div>
+            <div class="receipt-spec-row">
+              <span class="receipt-spec-key">Print Media</span>
+              <span class="receipt-spec-val" id="receiptPortalMedia">Museum Fine Art Canvas</span>
+            </div>
+            <div class="receipt-spec-row">
+              <span class="receipt-spec-key">Ready Estimate</span>
+              <span class="receipt-spec-val receipt-highlight-gold" id="receiptPortalDelivery">—</span>
+            </div>
+            <div class="receipt-spec-row" id="receiptPortalNotesRow">
+              <span class="receipt-spec-key">Workshop Notes</span>
+              <span class="receipt-spec-val" id="receiptPortalNotes">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="receipt-details-card">
+          <h2 class="receipt-section-heading">Payment Summary</h2>
+          <div class="receipt-payment-grid">
+            <div class="receipt-pay-cell">
+              <span class="receipt-meta-label">Total Frame &amp; Print</span>
+              <strong class="receipt-pay-figure" id="receiptPortalTotal">₹0</strong>
+            </div>
+            <div class="receipt-pay-cell">
+              <span class="receipt-meta-label">Advance Paid</span>
+              <strong class="receipt-pay-figure receipt-pay-paid" id="receiptPortalAdvance">₹0</strong>
+            </div>
+            <div class="receipt-pay-cell">
+              <span class="receipt-meta-label">Balance Due</span>
+              <strong class="receipt-pay-figure receipt-pay-balance" id="receiptPortalBalance">₹0</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="receipt-details-card receipt-contact-card">
+          <h2 class="receipt-section-heading">Contact Yashraj Frames Studio</h2>
+          <p class="receipt-contact-intro">
+            Questions about your portrait preview, frame finish, or pickup timing? Reach our workshop directly below.
+          </p>
+
+          <div class="receipt-contact-meta" id="receiptPortalContactMeta">
+            <div class="receipt-contact-line" id="receiptContactPhoneRow">
+              <svg style="width: 16px; height: 16px; color: var(--accent-gold);"><use href="#icon-phone"></use></svg>
+              <span id="receiptPortalShopPhone">Available via WhatsApp &amp; Email</span>
+            </div>
+            <div class="receipt-contact-line">
+              <svg style="width: 16px; height: 16px; color: var(--accent-gold);"><use href="#icon-mail"></use></svg>
+              <span id="receiptPortalShopEmail">yashrajart1999@gmail.com</span>
+            </div>
+            <div class="receipt-contact-line">
+              <svg style="width: 16px; height: 16px; color: var(--accent-gold);"><use href="#icon-clock"></use></svg>
+              <span id="receiptPortalShopHours">Mon–Sat, 10:00 AM – 8:30 PM</span>
+            </div>
+            <div class="receipt-contact-line">
+              <svg style="width: 16px; height: 16px; color: var(--accent-gold);"><use href="#icon-map-pin"></use></svg>
+              <span id="receiptPortalShopAddress">Yashraj Frames Custom Framing &amp; AI Photo Studio</span>
+            </div>
+          </div>
+
+          <div class="receipt-contact-actions">
+            <a class="receipt-cta-btn receipt-cta-whatsapp" id="btnReceiptWhatsApp" href="#" target="_blank" rel="noopener noreferrer">
+              <svg style="width: 18px; height: 18px;"><use href="#icon-whatsapp"></use></svg>
+              <span>Message on WhatsApp</span>
+            </a>
+            <a class="receipt-cta-btn receipt-cta-call" id="btnReceiptCall" href="#" style="display: none;">
+              <svg style="width: 17px; height: 17px;"><use href="#icon-phone"></use></svg>
+              <span>Call Studio</span>
+            </a>
+            <a class="receipt-cta-btn receipt-cta-email" id="btnReceiptEmail" href="mailto:yashrajart1999@gmail.com">
+              <svg style="width: 17px; height: 17px;"><use href="#icon-mail"></use></svg>
+              <span>Email Studio</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="receipt-portal-footer">
+          <button type="button" class="receipt-footer-btn" id="btnReceiptPrintCopy">
+            <svg style="width: 15px; height: 15px;"><use href="#icon-printer"></use></svg>
+            <span>Print / Save PDF Copy</span>
+          </button>
+          <button type="button" class="receipt-footer-link" id="btnExitReceiptPortal">
+            Back to Yashraj Frames Studio
+          </button>
+        </div>
+      </div>
+    </section>
 
     <!-- PINTEREST TOAST NOTIFICATION PILL -->
     <div class="toast-container" id="toastContainer"></div>

@@ -36,6 +36,13 @@
   --radius-pin: 16px;
   --radius-modal: 32px;
   --radius-pill: 9999px;
+
+  /* Compatibility Token Aliases */
+  --bg-card: var(--bg-surface);
+  --radius-card: 16px;
+  --border-dark: var(--border-subtle);
+  --gold-accent: var(--accent-gold);
+  --border-gold: rgba(214, 184, 121, 0.35);
   
   --transition-snappy: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-smooth: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1332,8 +1339,10 @@ h1, h2, h3, h4, .font-display {
   border-radius: 28px;
   max-width: 580px;
   width: 100%;
+  max-height: 90vh;
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   animation: modalPop 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   display: flex;
   flex-direction: column;
@@ -1435,6 +1444,19 @@ h1, h2, h3, h4, .font-display {
 
 .bg-chatgpt {
   background: linear-gradient(135deg, #10A37F, #0A6B53);
+}
+
+.bg-claude {
+  background: linear-gradient(135deg, #D97757, #A84C2C);
+}
+
+.bg-grok {
+  background: linear-gradient(135deg, #27272A, #09090B);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.bg-copilot {
+  background: linear-gradient(135deg, #2563EB, #7C3AED);
 }
 
 .bg-bing {
@@ -3155,12 +3177,18 @@ body.client-mode-active #modalClientShowroomCard {
   color: #000;
 }
 
-/* Print specific stylesheet for physical workshop slips */
+/* Print specific stylesheet for physical workshop slips & digital client receipts */
 @media print {
+  body {
+    background: #FFFFFF !important;
+    color: #111111 !important;
+  }
   body * {
     visibility: hidden;
   }
-  #shopJobSlipModal, #shopJobSlipModal * {
+  #shopJobSlipModal, #shopJobSlipModal *,
+  body.receipt-portal-active #clientReceiptPortal,
+  body.receipt-portal-active #clientReceiptPortal * {
     visibility: visible;
   }
   #shopJobSlipModal {
@@ -3168,17 +3196,1595 @@ body.client-mode-active #modalClientShowroomCard {
     left: 0;
     top: 0;
     width: 100%;
+    height: auto;
+    padding: 0;
     background: #FFFFFF !important;
-    color: #000000 !important;
+    color: #111111 !important;
   }
-  .job-slip-modal-card {
+  .job-slip-modal-card,
+  .shop-job-slip-card {
     background: #FFFFFF !important;
-    color: #000000 !important;
-    border: none;
-    box-shadow: none;
-    max-width: 100%;
+    color: #111111 !important;
+    border: none !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: 100% !important;
   }
-  .job-slip-actions-bar, #jobSlipCloseBtn {
+  .slip-brand-title,
+  .slip-order-badge,
+  .slip-qr-title-row {
+    color: #111111 !important;
+  }
+  .slip-brand-sub,
+  .slip-form-group label,
+  .slip-qr-desc {
+    color: #444444 !important;
+  }
+  .slip-input,
+  .slip-select {
+    background: #FFFFFF !important;
+    color: #111111 !important;
+    border: 1px solid #CCCCCC !important;
+  }
+  .slip-qr-card {
+    background: #F9F9F9 !important;
+    border: 1px solid #CCCCCC !important;
+    color: #111111 !important;
+    break-inside: avoid;
+  }
+  .slip-contact-details,
+  .slip-qr-actions,
+  .slip-preview-container,
+  .job-slip-actions-bar,
+  #jobSlipCloseBtn {
+    display: none !important;
+  }
+
+  body.receipt-portal-active #clientReceiptPortal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    min-height: auto;
+    padding: 12px;
+    background: #FFFFFF !important;
+    color: #111111 !important;
+  }
+  body.receipt-portal-active .receipt-order-banner,
+  body.receipt-portal-active .receipt-details-card,
+  body.receipt-portal-active .receipt-pay-cell {
+    background: #FFFFFF !important;
+    border: 1px solid #D4D4D8 !important;
+    color: #111111 !important;
+    box-shadow: none !important;
+  }
+  body.receipt-portal-active .receipt-brand-name,
+  body.receipt-portal-active .receipt-section-heading,
+  body.receipt-portal-active .receipt-order-num,
+  body.receipt-portal-active .receipt-order-date,
+  body.receipt-portal-active .receipt-spec-val,
+  body.receipt-portal-active .receipt-pay-figure,
+  body.receipt-portal-active .receipt-contact-line {
+    color: #111111 !important;
+  }
+  body.receipt-portal-active .receipt-brand-sub,
+  body.receipt-portal-active .receipt-meta-label,
+  body.receipt-portal-active .receipt-spec-key,
+  body.receipt-portal-active .receipt-contact-intro {
+    color: #555555 !important;
+  }
+  body.receipt-portal-active .receipt-contact-actions,
+  body.receipt-portal-active .receipt-portal-footer {
     display: none !important;
   }
 }
+
+/* ==========================================================================
+   ADD CUSTOM STYLE MODAL & SHARED SLIP CARD POLISH
+   ========================================================================== */
+.shop-job-slip-card {
+  background: #18191D;
+  border: 1px solid var(--border-light);
+  border-radius: 26px;
+  width: 92vw;
+  max-width: 660px;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 24px;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9);
+  animation: modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.slip-header-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 14px;
+  padding-right: 48px;
+  margin-bottom: 18px;
+}
+
+.modal-card-corner-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  left: auto;
+  width: 38px;
+  height: 38px;
+  z-index: 25;
+}
+
+.slip-logo-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slip-brand-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(214, 184, 121, 0.14);
+  border: 1px solid rgba(214, 184, 121, 0.35);
+  color: var(--accent-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.slip-brand-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.slip-brand-sub {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.slip-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.slip-select {
+  background: #111215;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  width: 100%;
+}
+
+.slip-select:focus {
+  outline: none;
+  border-color: var(--accent-gold);
+}
+
+.new-style-image-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   DESKTOP HIDDEN MOBILE-FIRST CONTROLS
+   ========================================================================== */
+.mobile-tools-trigger-btn {
+  display: none;
+}
+
+.pin-mobile-fav-btn {
+  display: none;
+}
+
+.pin-mobile-actions {
+  display: none;
+}
+
+.mobile-modal-sticky-dock {
+  display: none;
+}
+
+/* ==========================================================================
+   MOBILE STUDIO TOOLS BOTTOM SHEET
+   ========================================================================== */
+.mobile-sheet-backdrop {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.mobile-bottom-sheet-card {
+  background: #1A1B20;
+  border-top: 1px solid var(--border-light);
+  border-radius: 26px 26px 0 0;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  max-height: 86dvh;
+  overflow-y: auto;
+  padding: 10px 18px calc(22px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.85);
+  animation: sheetSlideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes sheetSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobile-sheet-drag-bar {
+  width: 42px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.24);
+  margin: 2px auto 14px;
+  cursor: pointer;
+}
+
+.mobile-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 14px;
+}
+
+.mobile-sheet-title {
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.mobile-sheet-sub {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.mobile-sheet-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-sheet-action-row {
+  width: 100%;
+  min-height: 60px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background var(--transition-snappy), border-color var(--transition-snappy);
+}
+
+.mobile-sheet-action-row:active {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--accent-gold);
+}
+
+.mobile-sheet-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mobile-sheet-icon.icon-gold {
+  background: rgba(214, 184, 121, 0.16);
+  color: var(--accent-gold);
+}
+
+.mobile-sheet-icon.icon-green {
+  background: rgba(37, 211, 102, 0.16);
+  color: #4ade80;
+}
+
+.mobile-sheet-icon.icon-neutral {
+  background: rgba(255, 255, 255, 0.08);
+  color: #E5E7EB;
+}
+
+.mobile-sheet-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobile-sheet-row-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.mobile-sheet-row-sub {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-sheet-row-meta {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--accent-gold);
+  flex-shrink: 0;
+}
+
+.mobile-sheet-status-text {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.mobile-sheet-status-text.is-active {
+  background: rgba(214, 184, 121, 0.2);
+  color: var(--accent-gold);
+}
+
+.mobile-sheet-count {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  min-width: 28px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   TABLET & MOBILE RESPONSIVE OVERHAUL (375px - 900px)
+   ========================================================================== */
+@media (max-width: 900px) {
+  .pinterest-header {
+    height: 60px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .brand-monogram-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 1.05rem;
+  }
+
+  /* Collapse secondary desktop header controls into the Studio Tools bottom sheet */
+  .btn-header-add-style,
+  .client-mode-toggle-btn,
+  .ai-header-selector-pill,
+  #btnHeaderHistory,
+  #btnHeaderSaved,
+  .user-profile-avatar {
+    display: none !important;
+  }
+
+  .mobile-tools-trigger-btn {
+    display: flex;
+    width: 42px;
+    height: 42px;
+  }
+
+  #btnHeaderShopOrders {
+    width: 42px;
+    height: 42px;
+  }
+
+  .header-right {
+    gap: 8px;
+  }
+
+  .pinterest-search-box {
+    height: 40px;
+    padding: 0 38px 0 38px;
+    font-size: 16px;
+  }
+
+  .search-magnifier-icon {
+    left: 12px;
+    width: 16px;
+    height: 16px;
+  }
+
+  .search-clear-cross {
+    right: 8px;
+  }
+
+  /* Keep category chips scrollable cleanly without stacking sticky chrome over 15% cap */
+  .pinterest-chips-bar {
+    position: static;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .pinterest-chip {
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .pinterest-viewport {
+    padding: 14px 10px calc(84px + env(safe-area-inset-bottom, 0px)) 10px;
+  }
+
+  /* Bottom Bar Thumb Navigation + Safe Area Inset */
+  .mobile-bottom-nav {
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding: 4px 6px env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-nav-item {
+    min-height: 46px;
+    min-width: 52px;
+    padding: 4px 6px;
+    font-size: 0.68rem;
+  }
+
+  .toast-container {
+    bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+    width: calc(100vw - 24px);
+    max-width: 420px;
+  }
+
+  .toast {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.84rem;
+    padding: 10px 16px;
+  }
+}
+
+/* Touch Devices & Smartphones (<= 768px) */
+@media (max-width: 768px), (hover: none) and (max-width: 900px) {
+  /* Replace hover-only card scrim with clean touch-first controls */
+  .pin-hover-scrim {
+    display: none !important;
+  }
+
+  .pin-card:hover .pin-image {
+    transform: none;
+    filter: none;
+  }
+
+  .pin-mobile-fav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-pill);
+    background: rgba(14, 15, 18, 0.72);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #FFFFFF;
+    z-index: 6;
+    cursor: pointer;
+    transition: transform var(--transition-snappy), background var(--transition-snappy);
+  }
+
+  .pin-mobile-fav-btn:active {
+    transform: scale(0.92);
+  }
+
+  .pin-mobile-fav-btn.is-fav {
+    background: var(--accent-pinterest-red);
+    border-color: var(--accent-pinterest-red);
+    color: #FFFFFF;
+  }
+
+  .pin-card {
+    margin-bottom: 16px;
+  }
+
+  .pin-info-row {
+    padding: 8px 2px 0 2px;
+  }
+
+  .pin-title-text {
+    font-size: 0.85rem;
+    line-height: 1.28;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .pin-author-row {
+    gap: 6px;
+  }
+
+  .pin-author-avatar {
+    width: 20px;
+    height: 20px;
+    font-size: 0.58rem;
+  }
+
+  .pin-author-name {
+    font-size: 0.72rem;
+  }
+
+  /* 1-tap Mobile Card Quick Actions below card metadata */
+  .pin-mobile-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  body.client-mode-active .pin-mobile-actions {
+    display: none !important;
+  }
+
+  .mob-pin-btn {
+    min-height: 36px;
+    border-radius: var(--radius-pill);
+    border: none;
+    font-family: var(--font-body);
+    font-size: 0.73rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 0 10px;
+    white-space: nowrap;
+    transition: transform var(--transition-snappy);
+  }
+
+  .mob-pin-btn:active {
+    transform: scale(0.95);
+  }
+
+  .mob-pin-ai {
+    flex: 1.25;
+    background: linear-gradient(135deg, #D6B879 0%, #B89758 100%);
+    color: #0E0F12;
+  }
+
+  .mob-pin-copy {
+    flex: 1;
+    background: var(--bg-surface-elevated);
+    color: #FFFFFF;
+    border: 1px solid var(--border-subtle);
+  }
+
+  .mob-pin-copy.copied {
+    background: #10B981;
+    border-color: #10B981;
+  }
+
+  .mob-pin-frame {
+    width: 36px;
+    padding: 0;
+    flex-shrink: 0;
+    background: rgba(214, 184, 121, 0.14);
+    border: 1px solid rgba(214, 184, 121, 0.35);
+    color: var(--accent-gold);
+  }
+
+  /* Feed Header Stacking */
+  .feed-header-strip {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 0 4px;
+    margin-bottom: 14px;
+  }
+
+  .feed-title {
+    font-size: 1.22rem;
+  }
+
+  /* Fullscreen Mobile Smooth-Scroll Pin Detail Modal + Sticky Thumb Dock */
+  #pinDetailModal {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  #pinDetailModal .pinterest-modal-card {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    width: 100%;
+    border-radius: 0;
+    border: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #pinDetailModal .modal-floating-close-btn {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    width: 42px;
+    height: 42px;
+  }
+
+  #pinDetailModal .modal-pin-visual-col {
+    max-height: none;
+    flex-shrink: 0;
+  }
+
+  #pinDetailModal .modal-pin-img-wrapper {
+    padding: 16px 14px 10px;
+  }
+
+  #pinDetailModal .modal-pin-img {
+    max-height: 44dvh;
+    border-radius: 16px;
+  }
+
+  #pinDetailModal .modal-img-bar {
+    padding: 10px 12px;
+    justify-content: center;
+  }
+
+  #pinDetailModal .modal-img-bar > span {
+    display: none;
+  }
+
+  #pinDetailModal .modal-img-bar > div {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  #pinDetailModal .modal-img-bar .pinterest-chip {
+    min-height: 38px;
+    padding: 6px 12px !important;
+    font-size: 0.78rem !important;
+  }
+
+  #pinDetailModal .modal-pin-details-col {
+    padding: 16px 16px 24px;
+    overflow-y: visible;
+    flex: 1 0 auto;
+  }
+
+  #pinDetailModal .modal-top-actions-bar {
+    margin-bottom: 14px;
+  }
+
+  /* Primary modal CTAs move to bottom thumb dock on phones */
+  #pinDetailModal .modal-top-actions-right {
+    display: none;
+  }
+
+  .modal-pin-title {
+    font-size: 1.38rem;
+  }
+
+  .modal-creator-profile {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+  }
+
+  .modal-pin-description {
+    font-size: 0.9rem;
+    margin-bottom: 14px;
+  }
+
+  .modal-tags-row {
+    margin-bottom: 16px;
+  }
+
+  .modal-prompt-body {
+    max-height: 200px;
+    font-size: 0.8rem;
+  }
+
+  .modal-verified-footer-row {
+    display: none !important;
+  }
+
+  .mobile-modal-sticky-dock {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    bottom: 0;
+    z-index: 25;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: rgba(20, 21, 25, 0.96);
+    backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border-light);
+    flex-shrink: 0;
+  }
+
+  body.client-mode-active #btnMobModalAutoTake,
+  body.client-mode-active #btnMobModalCopyPrompt {
+    display: none !important;
+  }
+
+  .mob-dock-btn {
+    min-height: 46px;
+    border-radius: var(--radius-pill);
+    border: none;
+    font-family: var(--font-body);
+    font-size: 0.86rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 0 12px;
+    white-space: nowrap;
+  }
+
+  .mob-dock-frame {
+    flex: 0.9;
+    background: rgba(214, 184, 121, 0.14);
+    border: 1px solid var(--accent-gold);
+    color: var(--accent-gold);
+  }
+
+  .mob-dock-ai {
+    flex: 1.3;
+    background: linear-gradient(135deg, #D6B879 0%, #B89758 100%);
+    color: #0E0F12;
+  }
+
+  .mob-dock-copy {
+    flex: 1;
+    background: var(--accent-pinterest-red);
+    color: #FFFFFF;
+  }
+
+  .mob-dock-copy.copied {
+    background: #10B981;
+  }
+
+  /* Framing Studio Mobile Sizing & Controls */
+  .framing-header-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .framing-header-actions .btn-framing-upload,
+  .framing-header-actions .pinterest-chip {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+
+  .framing-workspace-grid {
+    gap: 16px;
+    margin-top: 12px;
+  }
+
+  .framing-stage-card {
+    border-radius: 18px;
+  }
+
+  .wall-environment-bar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .wall-bar-label {
+    display: none;
+  }
+
+  .wall-pills-group {
+    flex: 1 1 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .wall-pills-group::-webkit-scrollbar {
+    display: none;
+  }
+
+  .wall-pill {
+    min-height: 36px;
+    padding: 6px 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .btn-wall-snapshot {
+    flex: 1;
+    margin-left: 0;
+    justify-content: center;
+    min-height: 38px;
+  }
+
+  .framing-wall-surface {
+    min-height: 360px;
+    padding: 24px 12px 46px;
+  }
+
+  .framed-photo-img {
+    width: min(200px, 52vw);
+    max-height: 270px;
+  }
+
+  .frame-moulding-gold,
+  .frame-moulding-teak,
+  .frame-moulding-silver,
+  .frame-moulding-oak {
+    padding: 13px;
+  }
+
+  .frame-moulding-black {
+    padding: 11px;
+  }
+
+  .passepartout-mount.mount-white,
+  .passepartout-mount.mount-offwhite,
+  .passepartout-mount.mount-charcoal {
+    padding: 13px;
+  }
+
+  .frame-dimensions-tag {
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+    gap: 4px 6px;
+    padding: 6px 12px;
+    font-size: 0.72rem;
+    max-width: 94%;
+    border-radius: 14px;
+  }
+
+  .framing-sidebar-card {
+    padding: 16px;
+    border-radius: 18px;
+    gap: 16px;
+  }
+
+  .frame-sizes-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .mount-option-btn,
+  .media-pill-btn {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-whatsapp-job-slip,
+  .btn-sync-ai-take {
+    min-height: 48px;
+  }
+
+  /* Client Mode Banner on Mobile */
+  .client-mode-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  .btn-exit-client-mode {
+    width: 100%;
+    min-height: 40px;
+  }
+}
+
+/* Bottom Sheet Modal Layouts on Mobile Phones (<= 640px) */
+@media (max-width: 640px) {
+  #aiAutoTakeModal,
+  #shopJobSlipModal,
+  #addStyleModal,
+  #presetPickerModal,
+  #shopOrdersModal {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .ai-launcher-card,
+  .job-slip-modal-card,
+  .shop-job-slip-card,
+  .preset-picker-card,
+  .shop-orders-card {
+    width: 100%;
+    max-width: 100%;
+    max-height: 90dvh;
+    border-radius: 24px 24px 0 0;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .ai-launcher-header,
+  .ai-launcher-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .ai-launcher-title {
+    font-size: 1.25rem;
+  }
+
+  .ai-target-btn {
+    padding: 12px 12px;
+    gap: 12px;
+  }
+
+  .ai-target-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .slip-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Prevent iOS Safari input auto-zoom */
+  .slip-input,
+  .slip-select,
+  .preset-picker-search-box input {
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  .preset-picker-header,
+  .shop-orders-header {
+    padding: 16px 60px 14px 16px;
+  }
+
+  .preset-picker-search-box {
+    width: 100%;
+  }
+
+  .preset-picker-grid {
+    padding: 14px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .picker-preset-img {
+    height: 132px;
+  }
+
+  .shop-orders-header {
+    padding: 16px 56px 14px 16px;
+  }
+
+  .orders-filter-row {
+    padding: 10px 14px;
+  }
+
+  .orders-filter-pills {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .orders-filter-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .orders-filter-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 36px;
+  }
+
+  .orders-table-wrapper {
+    padding: 14px;
+  }
+
+  .order-card-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .order-item-right {
+    justify-content: flex-start;
+  }
+
+  .btn-order-action {
+    min-height: 38px;
+    padding: 6px 14px;
+  }
+
+  .job-slip-actions-bar {
+    flex-direction: column;
+  }
+
+  .job-slip-actions-bar button {
+    width: 100%;
+    min-height: 46px;
+  }
+}
+
+/* ==========================================================================
+   JOB SLIP QR PASS & COLLAPSIBLE SHOP CONTACT SETTINGS
+   ========================================================================== */
+.slip-contact-details {
+  margin-top: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.slip-contact-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-height: 28px;
+}
+
+.slip-contact-summary::-webkit-details-marker {
+  display: none;
+}
+
+.slip-contact-summary-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slip-contact-edit-hint {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--accent-gold);
+  background: var(--accent-gold-dim);
+  border: 1px solid var(--border-gold);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.slip-qr-card {
+  margin-top: 16px;
+  background: linear-gradient(135deg, rgba(214, 184, 121, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
+  border: 1px solid var(--border-gold);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.slip-qr-canvas-frame {
+  flex-shrink: 0;
+  width: 164px;
+  height: 164px;
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+.slip-qr-canvas-frame canvas {
+  display: block;
+  width: 152px !important;
+  height: 152px !important;
+  border-radius: 6px;
+}
+
+.slip-qr-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slip-qr-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.slip-qr-desc {
+  font-size: 0.8rem;
+  line-height: 1.48;
+  color: var(--text-secondary);
+}
+
+.slip-qr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.btn-qr-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 7px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-snappy), border-color var(--transition-snappy), transform var(--transition-snappy);
+}
+
+.btn-qr-action:hover {
+  background: rgba(214, 184, 121, 0.16);
+  border-color: var(--border-gold);
+  color: var(--accent-gold);
+}
+
+.btn-qr-action:active {
+  transform: scale(0.97);
+}
+
+/* ==========================================================================
+   CLIENT DIGITAL ORDER RECEIPT & STUDIO CONTACT PORTAL (QR SCAN TARGET)
+   ========================================================================== */
+body.receipt-portal-active .pinterest-header,
+body.receipt-portal-active .client-mode-banner,
+body.receipt-portal-active .pinterest-chips-bar,
+body.receipt-portal-active .pinterest-viewport,
+body.receipt-portal-active .mobile-bottom-nav,
+body.receipt-portal-active .pinterest-modal-backdrop {
+  display: none !important;
+}
+
+.client-receipt-portal {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(214, 184, 121, 0.12), transparent 52%),
+    var(--bg-primary);
+  padding: 28px 16px 64px;
+}
+
+.receipt-portal-shell {
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.receipt-portal-brand-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.receipt-brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.receipt-monogram {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #E8D09E 0%, #B38728 100%);
+  color: #111215;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.receipt-brand-name {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.15;
+}
+
+.receipt-brand-sub {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.receipt-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border-gold);
+  background: var(--accent-gold-dim);
+  color: var(--accent-gold);
+}
+
+.receipt-status-pill.in-progress {
+  background: rgba(214, 184, 121, 0.15);
+  border-color: rgba(214, 184, 121, 0.45);
+  color: #E8D09E;
+}
+
+.receipt-status-pill.ready {
+  background: rgba(37, 211, 102, 0.16);
+  border-color: rgba(37, 211, 102, 0.45);
+  color: #4ADE80;
+}
+
+.receipt-status-pill.delivered {
+  background: rgba(96, 165, 250, 0.16);
+  border-color: rgba(96, 165, 250, 0.45);
+  color: #93C5FD;
+}
+
+.receipt-order-banner {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 18px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.receipt-meta-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.receipt-order-num {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--accent-gold);
+}
+
+.receipt-order-date {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.receipt-details-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 18px 20px;
+}
+
+.receipt-section-heading {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.receipt-spec-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.receipt-spec-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.receipt-spec-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.receipt-spec-key {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.receipt-spec-val {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+  word-break: break-word;
+}
+
+.receipt-highlight-gold {
+  color: var(--accent-gold);
+}
+
+.receipt-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.receipt-pay-cell {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.receipt-pay-figure {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.receipt-pay-paid {
+  color: #4ADE80;
+}
+
+.receipt-pay-balance {
+  color: var(--accent-gold);
+}
+
+.receipt-contact-card {
+  border-color: var(--border-gold);
+}
+
+.receipt-contact-intro {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.receipt-contact-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.receipt-contact-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.receipt-contact-line svg {
+  flex-shrink: 0;
+}
+
+.receipt-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.receipt-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--transition-snappy), opacity var(--transition-snappy);
+}
+
+.receipt-cta-btn:active {
+  transform: scale(0.98);
+}
+
+.receipt-cta-whatsapp {
+  background: #25D366;
+  color: #08130B;
+}
+
+.receipt-cta-call {
+  background: var(--accent-gold);
+  color: #111215;
+}
+
+.receipt-cta-email {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+}
+
+.receipt-portal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.receipt-footer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.receipt-footer-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--accent-gold);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .slip-contact-details input,
+  .slip-contact-details .slip-input {
+    font-size: 16px;
+  }
+
+  .slip-qr-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 16px 14px;
+  }
+
+  .slip-qr-title-row {
+    justify-content: center;
+  }
+
+  .slip-qr-actions {
+    justify-content: center;
+  }
+
+  .btn-qr-action {
+    min-height: 44px;
+    flex: 1 1 auto;
+  }
+
+  .client-receipt-portal {
+    padding: 18px 12px 48px;
+  }
+
+  .receipt-order-banner {
+    padding: 14px 16px;
+  }
+
+  .receipt-details-card {
+    padding: 16px;
+  }
+
+  .receipt-spec-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+
+  .receipt-spec-val {
+    text-align: left;
+  }
+
+  .receipt-payment-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .receipt-cta-btn {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .receipt-portal-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .receipt-footer-btn,
+  .receipt-footer-link {
+    width: 100%;
+  }
+}
+
+

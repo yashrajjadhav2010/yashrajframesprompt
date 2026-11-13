@@ -4,6 +4,7 @@
  * Vanilla JavaScript Architecture
  */
 
+import QRCode from 'qrcode';
 import { prompts as importedPrompts, CATEGORIES as importedCategories } from './prompts.js';
 
 (function () {
@@ -18,28 +19,71 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     DEFAULT_AI_APP: 'yashraj_default_ai_app',
     CLIENT_MODE: 'yashraj_client_mode',
     CUSTOM_STYLES: 'yashraj_custom_styles',
-    SHOP_ORDERS: 'yashraj_shop_orders'
+    SHOP_ORDERS: 'yashraj_shop_orders',
+    SHOP_CONTACT: 'yashraj_shop_contact'
   };
+
+  function cleanPromptForAi(text) {
+    if (!text) return '';
+    return String(text)
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\s*\[cite:\s*[\d,\s]+\]/gi, '')
+      .replace(/\r\n/g, '\n')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function truncateAtWord(text, maxLen) {
+    const clean = cleanPromptForAi(text);
+    if (clean.length <= maxLen) return clean;
+    const sliced = clean.slice(0, maxLen);
+    const lastSpace = sliced.lastIndexOf(' ');
+    return (lastSpace > maxLen * 0.6 ? sliced.slice(0, lastSpace) : sliced).trim();
+  }
+
+  function isMobileDevice() {
+    if (typeof navigator === 'undefined') return false;
+    const uaMatch = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
+    const touchTablet = (navigator.maxTouchPoints || 0) > 1 && window.innerWidth < 1024;
+    return uaMatch || touchTablet;
+  }
 
   const AI_APPS = {
     chatgpt: {
-      name: 'ChatGPT',
-      getUrl: (p) => `https://chatgpt.com/?q=${encodeURIComponent(p)}`,
+      name: 'ChatGPT Web',
+      getUrl: (p) => `https://chatgpt.com/?${new URLSearchParams({ q: cleanPromptForAi(p) }).toString()}`,
+      action: 'url'
+    },
+    claude: {
+      name: 'Claude Web',
+      getUrl: (p) => `https://claude.ai/new?${new URLSearchParams({ q: cleanPromptForAi(p) }).toString()}`,
       action: 'url'
     },
     bing: {
       name: 'Bing Image Creator',
-      getUrl: (p) => `https://www.bing.com/images/create?q=${encodeURIComponent(p)}`,
+      getUrl: (p) => `https://www.bing.com/images/create?${new URLSearchParams({ q: truncateAtWord(p, 480) }).toString()}`,
       action: 'url'
     },
-    gemini: {
-      name: 'Google Gemini',
-      getUrl: () => `https://gemini.google.com/app`,
+    grok: {
+      name: 'Grok Web',
+      getUrl: (p) => `https://grok.com/?${new URLSearchParams({ q: cleanPromptForAi(p) }).toString()}`,
       action: 'url'
     },
     perplexity: {
       name: 'Perplexity AI',
-      getUrl: (p) => `https://www.perplexity.ai/?q=${encodeURIComponent(p)}`,
+      getUrl: (p) => `https://www.perplexity.ai/search?${new URLSearchParams({ q: cleanPromptForAi(p) }).toString()}`,
+      action: 'url'
+    },
+    copilot: {
+      name: 'Microsoft Copilot',
+      getUrl: (p) => `https://copilot.microsoft.com/?${new URLSearchParams({ q: cleanPromptForAi(p) }).toString()}`,
+      action: 'url'
+    },
+    gemini: {
+      name: 'Google Gemini Web',
+      getUrl: (p) => `https://gemini.google.com/app?${new URLSearchParams({ prompt: cleanPromptForAi(p) }).toString()}`,
+      clipboardOnlyNote: true,
       action: 'url'
     },
     midjourney: {
@@ -133,6 +177,22 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     btnHeaderAddStyle: document.getElementById('btnHeaderAddStyle'),
     btnHeaderShopOrders: document.getElementById('btnHeaderShopOrders'),
     badgeOrdersCount: document.getElementById('badge-orders-count'),
+    btnMobileToolsTrigger: document.getElementById('btnMobileToolsTrigger'),
+    badgeMobileTools: document.getElementById('badge-mobile-tools'),
+
+    // Mobile Studio Tools Bottom Sheet
+    mobileToolsSheet: document.getElementById('mobileToolsSheet'),
+    mobToolsCloseBtn: document.getElementById('mobToolsCloseBtn'),
+    mobSheetDragClose: document.getElementById('mobSheetDragClose'),
+    mobSheetAiTarget: document.getElementById('mobSheetAiTarget'),
+    mobSheetAiLabel: document.getElementById('mobSheetAiLabel'),
+    mobSheetShowroomMode: document.getElementById('mobSheetShowroomMode'),
+    mobSheetShowroomBadge: document.getElementById('mobSheetShowroomBadge'),
+    mobSheetShopOrders: document.getElementById('mobSheetShopOrders'),
+    mobSheetOrdersCount: document.getElementById('mobSheetOrdersCount'),
+    mobSheetAddStyle: document.getElementById('mobSheetAddStyle'),
+    mobSheetHistory: document.getElementById('mobSheetHistory'),
+    mobSheetRecentCount: document.getElementById('mobSheetRecentCount'),
 
     // Badges & Counters
     badgeRecentCount: document.getElementById('badge-recent-count'),
@@ -152,6 +212,7 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     aiDefaultStatusRow: document.getElementById('aiDefaultStatusRow'),
     lblCurrentDefaultApp: document.getElementById('lblCurrentDefaultApp'),
     btnResetDefaultAiApp: document.getElementById('btnResetDefaultAiApp'),
+    btnTargetNativeShare: document.getElementById('btnTargetNativeShare'),
 
     // Masonry Grids
     homePinsMasonry: document.getElementById('homePinsMasonry'),
@@ -177,6 +238,10 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     btnModalAutoTake: document.getElementById('btnModalAutoTake'),
     btnModalCopyPrompt: document.getElementById('btnModalCopyPrompt'),
     btnModalCopyLabel: document.getElementById('btnModalCopyLabel'),
+    btnMobModalFrame: document.getElementById('btnMobModalFrame'),
+    btnMobModalAutoTake: document.getElementById('btnMobModalAutoTake'),
+    btnMobModalCopyPrompt: document.getElementById('btnMobModalCopyPrompt'),
+    lblMobModalCopy: document.getElementById('lblMobModalCopy'),
     modalPinTitle: document.getElementById('modalPinTitle'),
     modalCategoryBadge: document.getElementById('modalCategoryBadge'),
     modalPinDesc: document.getElementById('modalPinDesc'),
@@ -239,11 +304,45 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     numBalanceDue: document.getElementById('numBalanceDue'),
     txtDeliveryEstimate: document.getElementById('txtDeliveryEstimate'),
     txtSlipNotes: document.getElementById('txtSlipNotes'),
+    txtShopPhone: document.getElementById('txtShopPhone'),
+    txtShopEmail: document.getElementById('txtShopEmail'),
+    txtShopHours: document.getElementById('txtShopHours'),
+    txtShopAddress: document.getElementById('txtShopAddress'),
+    jobSlipQrCanvas: document.getElementById('jobSlipQrCanvas'),
+    btnPreviewDigitalReceipt: document.getElementById('btnPreviewDigitalReceipt'),
+    btnCopySlipLink: document.getElementById('btnCopySlipLink'),
+    lblCopySlipLink: document.getElementById('lblCopySlipLink'),
+    btnDownloadSlipQr: document.getElementById('btnDownloadSlipQr'),
     slipWhatsAppPreviewText: document.getElementById('slipWhatsAppPreviewText'),
     btnSendWhatsAppSlip: document.getElementById('btnSendWhatsAppSlip'),
     btnCopyJobSlip: document.getElementById('btnCopyJobSlip'),
     lblCopyJobSlip: document.getElementById('lblCopyJobSlip'),
     btnPrintJobSlip: document.getElementById('btnPrintJobSlip'),
+
+    // Client Digital Receipt & Contact Portal
+    clientReceiptPortal: document.getElementById('clientReceiptPortal'),
+    receiptPortalStatus: document.getElementById('receiptPortalStatus'),
+    receiptPortalOrderNum: document.getElementById('receiptPortalOrderNum'),
+    receiptPortalDate: document.getElementById('receiptPortalDate'),
+    receiptPortalCustomer: document.getElementById('receiptPortalCustomer'),
+    receiptPortalStyle: document.getElementById('receiptPortalStyle'),
+    receiptPortalFrame: document.getElementById('receiptPortalFrame'),
+    receiptPortalMedia: document.getElementById('receiptPortalMedia'),
+    receiptPortalDelivery: document.getElementById('receiptPortalDelivery'),
+    receiptPortalNotesRow: document.getElementById('receiptPortalNotesRow'),
+    receiptPortalNotes: document.getElementById('receiptPortalNotes'),
+    receiptPortalTotal: document.getElementById('receiptPortalTotal'),
+    receiptPortalAdvance: document.getElementById('receiptPortalAdvance'),
+    receiptPortalBalance: document.getElementById('receiptPortalBalance'),
+    receiptPortalShopPhone: document.getElementById('receiptPortalShopPhone'),
+    receiptPortalShopEmail: document.getElementById('receiptPortalShopEmail'),
+    receiptPortalShopHours: document.getElementById('receiptPortalShopHours'),
+    receiptPortalShopAddress: document.getElementById('receiptPortalShopAddress'),
+    btnReceiptWhatsApp: document.getElementById('btnReceiptWhatsApp'),
+    btnReceiptCall: document.getElementById('btnReceiptCall'),
+    btnReceiptEmail: document.getElementById('btnReceiptEmail'),
+    btnReceiptPrintCopy: document.getElementById('btnReceiptPrintCopy'),
+    btnExitReceiptPortal: document.getElementById('btnExitReceiptPortal'),
 
     // Preset Picker Modal
     presetPickerModal: document.getElementById('presetPickerModal'),
@@ -346,13 +445,25 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
 
   function updateOrdersBadge() {
     const activeCount = state.shopOrders.filter(o => o.status === 'in-progress' || o.status === 'ready').length;
+    const textVal = activeCount > 99 ? '99+' : activeCount;
     if (dom.badgeOrdersCount) {
       if (activeCount > 0) {
-        dom.badgeOrdersCount.style.display = 'block';
-        dom.badgeOrdersCount.textContent = activeCount > 99 ? '99+' : activeCount;
+        dom.badgeOrdersCount.style.display = 'flex';
+        dom.badgeOrdersCount.textContent = textVal;
       } else {
         dom.badgeOrdersCount.style.display = 'none';
       }
+    }
+    if (dom.badgeMobileTools) {
+      if (activeCount > 0) {
+        dom.badgeMobileTools.style.display = 'flex';
+        dom.badgeMobileTools.textContent = textVal;
+      } else {
+        dom.badgeMobileTools.style.display = 'none';
+      }
+    }
+    if (dom.mobSheetOrdersCount) {
+      dom.mobSheetOrdersCount.textContent = activeCount;
     }
   }
 
@@ -452,27 +563,67 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
   // ==========================================================================
   // AI AUTO TAKE ENGINE (Takes prompt directly to external AI App without copy-paste)
   // ==========================================================================
+  function copyPromptSync(promptText, pinId) {
+    const clean = cleanPromptForAi(promptText);
+    let copied = false;
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = clean;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '0';
+      textarea.style.left = '0';
+      textarea.style.width = '1px';
+      textarea.style.height = '1px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus({ preventScroll: true });
+      textarea.select();
+      textarea.setSelectionRange(0, clean.length);
+      copied = document.execCommand('copy');
+      document.body.removeChild(textarea);
+    } catch (e) {
+      // Ignore sync fallback error
+    }
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(clean).catch(() => {});
+    }
+
+    if (pinId) recordRecent(pinId);
+    return copied;
+  }
+
   function openExternalUrl(url) {
     if (!url) return;
     const a = document.createElement('a');
     a.href = url;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
+    a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   }
 
   function updateHeaderAiIndicator() {
-    if (!dom.lblHeaderAiTarget) return;
+    const labelText = (state.defaultAiApp && AI_APPS[state.defaultAiApp])
+      ? `AI: ${AI_APPS[state.defaultAiApp].name.split(' ')[0]}`
+      : 'AI: Auto';
+    if (dom.lblHeaderAiTarget) {
+      dom.lblHeaderAiTarget.textContent = labelText;
+    }
+    if (dom.mobSheetAiLabel) {
+      dom.mobSheetAiLabel.textContent = (state.defaultAiApp && AI_APPS[state.defaultAiApp])
+        ? `Default: ${AI_APPS[state.defaultAiApp].name}`
+        : 'AI: Ask each time (Auto)';
+    }
     if (state.defaultAiApp && AI_APPS[state.defaultAiApp]) {
       const app = AI_APPS[state.defaultAiApp];
-      dom.lblHeaderAiTarget.textContent = `AI: ${app.name.split(' ')[0]}`;
       if (dom.aiDefaultStatusRow) dom.aiDefaultStatusRow.style.display = 'block';
       if (dom.lblCurrentDefaultApp) dom.lblCurrentDefaultApp.textContent = app.name;
       if (dom.chkRememberAiApp) dom.chkRememberAiApp.checked = true;
     } else {
-      dom.lblHeaderAiTarget.textContent = 'AI: Auto';
       if (dom.aiDefaultStatusRow) dom.aiDefaultStatusRow.style.display = 'none';
       if (dom.chkRememberAiApp) dom.chkRememberAiApp.checked = false;
     }
@@ -482,8 +633,11 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     if (!pin) return;
     state.activeTargetPin = pin;
     if (dom.aiLauncherPromptPreview) {
-      const cleanPrompt = pin.prompt.replace(/\s+/g, ' ').trim();
+      const cleanPrompt = cleanPromptForAi(pin.prompt).replace(/\s+/g, ' ');
       dom.aiLauncherPromptPreview.textContent = `"${cleanPrompt.slice(0, 160)}${cleanPrompt.length > 160 ? '...' : ''}"`;
+    }
+    if (dom.btnTargetNativeShare) {
+      dom.btnTargetNativeShare.style.display = isMobileDevice() ? 'flex' : 'none';
     }
     updateHeaderAiIndicator();
     dom.aiAutoTakeModal.classList.add('active');
@@ -497,47 +651,54 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     }
   }
 
-  async function executeAiAutoTake(pin, targetKey) {
+  function executeAiAutoTake(pin, targetKey) {
     if (!pin || !pin.prompt) return;
-    recordRecent(pin.id);
+    const cleanPrompt = cleanPromptForAi(pin.prompt);
 
-    // Fail-safe: silently copy prompt to clipboard so it's always ready
-    await copyPromptToClipboard(pin.prompt, pin.id, false);
+    // Synchronous clipboard copy BEFORE opening tab so browser user activation is preserved
+    copyPromptSync(cleanPrompt, pin.id);
 
-    const app = AI_APPS[targetKey] || AI_APPS['chatgpt'];
+    const app = AI_APPS[targetKey] || AI_APPS.chatgpt;
 
     if (targetKey === 'native_share') {
-      if (navigator.share) {
-        try {
-          await navigator.share({
-            title: `${pin.title} - Yashraj Frames`,
-            text: pin.prompt
-          });
+      if (isMobileDevice() && navigator.share) {
+        navigator.share({
+          title: `${pin.title} - Yashraj Frames`,
+          text: cleanPrompt
+        }).then(() => {
           showToast('Sent prompt to your device apps!');
-          return;
-        } catch (err) {
-          // Fallback to chatgpt if user dismissed share or unsupported
-          openExternalUrl(AI_APPS.chatgpt.getUrl(pin.prompt));
-          showToast('Prompt copied! Opening ChatGPT...');
-          return;
-        }
-      } else {
-        openExternalUrl(AI_APPS.chatgpt.getUrl(pin.prompt));
-        showToast('Prompt copied! Opening ChatGPT...');
+        }).catch(() => {
+          openExternalUrl(AI_APPS.chatgpt.getUrl(cleanPrompt));
+          showToast('Prompt copied! Opening ChatGPT Web...');
+        });
         return;
       }
+      openExternalUrl(AI_APPS.chatgpt.getUrl(cleanPrompt));
+      showToast('Desktop detected — copied prompt & opening ChatGPT Web!');
+      return;
     }
 
     if (app && app.action === 'url') {
-      const url = app.getUrl(pin.prompt);
+      const url = app.getUrl(cleanPrompt);
       openExternalUrl(url);
-      showToast(`✨ Launching ${app.name} with prompt prefilled!`);
+      if (app.clipboardOnlyNote) {
+        showToast('Prompt copied! Opening Gemini Web — press Ctrl+V (⌘V) to paste');
+      } else {
+        showToast(`Launching ${app.name} with prompt! (Also copied for Ctrl+V)`);
+      }
     }
   }
 
   function handleAiAutoTake(pin) {
     if (!pin) return;
     state.activeTargetPin = pin;
+
+    // Clear mobile-only default if user switched to desktop
+    if (!isMobileDevice() && state.defaultAiApp === 'native_share') {
+      state.defaultAiApp = null;
+      localStorage.removeItem(STORAGE_KEYS.DEFAULT_AI_APP);
+      updateHeaderAiIndicator();
+    }
 
     // If user has a default AI app saved, launch immediately without extra clicks!
     if (state.defaultAiApp && AI_APPS[state.defaultAiApp]) {
@@ -567,6 +728,11 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
       if (dom.clientModeBanner) dom.clientModeBanner.style.display = 'none';
       localStorage.setItem(STORAGE_KEYS.CLIENT_MODE, 'false');
       showToast('Studio Editor Mode Restored (Prompts visible)');
+    }
+
+    if (dom.mobSheetShowroomBadge) {
+      dom.mobSheetShowroomBadge.textContent = state.clientMode ? 'Active' : 'Off';
+      dom.mobSheetShowroomBadge.classList.toggle('is-active', state.clientMode);
     }
 
     // Refresh modal if currently open
@@ -714,9 +880,10 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
   }
 
   function handleFramingAiAutoTake() {
-    const pin = state.framing.activePinId 
-      ? promptList.find(p => p.id === state.framing.activePinId) 
-      : (promptList[0] || null);
+    const allPins = getAllPrompts();
+    const pin = state.framing.activePinId
+      ? allPins.find(p => p.id === state.framing.activePinId)
+      : (allPins[0] || null);
 
     if (!pin) {
       showToast('Please select a studio style first');
@@ -735,34 +902,205 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
   }
 
   // ==========================================================================
-  // SHOP CUSTOMER JOB SLIP & WHATSAPP ENGINE
+  // SHOP CUSTOMER JOB SLIP, QR CODE & DIGITAL RECEIPT PORTAL
   // ==========================================================================
+  const DEFAULT_SHOP_CONTACT = {
+    phone: '',
+    email: 'yashrajart1999@gmail.com',
+    hours: 'Mon–Sat, 10:00 AM – 8:30 PM',
+    address: 'Yashraj Frames Custom Framing & AI Photo Studio'
+  };
+
+  function getShopContactConfig() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.SHOP_CONTACT);
+      if (raw) {
+        return { ...DEFAULT_SHOP_CONTACT, ...JSON.parse(raw) };
+      }
+    } catch (e) {
+      // ignore storage read error
+    }
+    return { ...DEFAULT_SHOP_CONTACT };
+  }
+
+  function saveShopContactConfigFromInputs() {
+    const config = {
+      phone: dom.txtShopPhone ? dom.txtShopPhone.value.trim() : '',
+      email: (dom.txtShopEmail && dom.txtShopEmail.value.trim()) || DEFAULT_SHOP_CONTACT.email,
+      hours: (dom.txtShopHours && dom.txtShopHours.value.trim()) || DEFAULT_SHOP_CONTACT.hours,
+      address: (dom.txtShopAddress && dom.txtShopAddress.value.trim()) || DEFAULT_SHOP_CONTACT.address
+    };
+    try {
+      localStorage.setItem(STORAGE_KEYS.SHOP_CONTACT, JSON.stringify(config));
+    } catch (e) {
+      // ignore storage write error
+    }
+    return config;
+  }
+
+  function encodeReceiptPayload(payloadObj) {
+    const json = JSON.stringify(payloadObj);
+    const bytes = new TextEncoder().encode(json);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function decodeReceiptPayload(token) {
+    if (!token) return null;
+    try {
+      const base64 = token.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = base64.length % 4 ? '='.repeat(4 - (base64.length % 4)) : '';
+      const binary = atob(base64 + pad);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const json = new TextDecoder().decode(bytes);
+      return JSON.parse(json);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  const MEDIA_LABELS = {
+    canvas: 'Museum Fine Art Canvas',
+    pearl: 'Ultra-HD Pearl Lustre',
+    matte: 'Royal Matte Fine Art'
+  };
+
+  let activeSlipStatus = 'in-progress';
+  let activeSlipDate = '';
+
   function generateOrderNumber() {
     const random = Math.floor(100 + Math.random() * 900);
     const yr = new Date().getFullYear();
     return `YF-${yr}-${random}`;
   }
 
-  function openJobSlipModal() {
+  function buildCurrentSlipOrderData() {
+    const custName = (dom.txtCustomerName && dom.txtCustomerName.value.trim()) || 'Valued Customer';
+    const rawPhone = dom.txtCustomerPhone ? dom.txtCustomerPhone.value.trim() : '';
+    const orderNum = (dom.lblSlipOrderNum && dom.lblSlipOrderNum.textContent.replace('Order ', '').replace('#', '').trim()) || generateOrderNumber();
+    const styleName = (dom.txtSlipStyleName && dom.txtSlipStyleName.value.trim()) || state.framing.title;
+    const frameDetails = (dom.txtSlipFrameDetails && dom.txtSlipFrameDetails.value.trim()) || '16" × 24" — Royal Ornate Gold';
+    const mediaLabel = MEDIA_LABELS[state.framing.media] || 'Museum Fine Art Canvas';
+    const price = Number(dom.numFramePrice ? dom.numFramePrice.value : state.framing.price) || 0;
+    const advance = Number(dom.numAdvancePaid ? dom.numAdvancePaid.value : 0) || 0;
+    const balance = Math.max(0, price - advance);
+    const delivery = (dom.txtDeliveryEstimate && dom.txtDeliveryEstimate.value.trim()) || 'Tomorrow by 6:00 PM';
+    const notes = (dom.txtSlipNotes && dom.txtSlipNotes.value.trim()) || '';
+    const dateStr = activeSlipDate || (dom.lblSlipDate ? dom.lblSlipDate.textContent.trim() : '');
+    const contact = saveShopContactConfigFromInputs();
+
+    return {
+      orderNum,
+      date: dateStr,
+      customerName: custName,
+      customerPhone: rawPhone,
+      styleName,
+      frameDetails,
+      mediaLabel,
+      price,
+      advance,
+      balance,
+      delivery,
+      notes,
+      status: activeSlipStatus || 'in-progress',
+      contact
+    };
+  }
+
+  function buildDigitalReceiptUrl(orderData) {
+    const contact = orderData.contact || getShopContactConfig();
+    const compact = {
+      o: orderData.orderNum,
+      d: orderData.date || new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
+      n: orderData.customerName,
+      s: orderData.styleName,
+      f: orderData.frameDetails,
+      m: orderData.mediaLabel || 'Museum Fine Art Canvas',
+      t: orderData.price,
+      a: orderData.advance,
+      b: orderData.balance,
+      e: orderData.delivery,
+      w: orderData.notes || '',
+      st: orderData.status || 'in-progress',
+      sp: contact.phone || '',
+      se: contact.email || DEFAULT_SHOP_CONTACT.email,
+      sh: contact.hours || DEFAULT_SHOP_CONTACT.hours,
+      sa: contact.address || DEFAULT_SHOP_CONTACT.address
+    };
+    const token = encodeReceiptPayload(compact);
+    const baseUrl = `${window.location.origin}${window.location.pathname}`;
+    return `${baseUrl}#receipt?d=${token}`;
+  }
+
+  function renderJobSlipQrCode() {
+    if (!dom.jobSlipQrCanvas) return;
+    const orderData = buildCurrentSlipOrderData();
+    const receiptUrl = buildDigitalReceiptUrl(orderData);
+    QRCode.toCanvas(dom.jobSlipQrCanvas, receiptUrl, {
+      width: 152,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#111215',
+        light: '#FFFFFF'
+      }
+    }).catch((err) => {
+      console.error('QR generation failed', err);
+    });
+  }
+
+  function openJobSlipModal(prefillOrder = null) {
     if (!dom.shopJobSlipModal) return;
 
-    const orderId = generateOrderNumber();
-    const today = new Date().toLocaleDateString('en-IN', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    const contact = getShopContactConfig();
+    if (dom.txtShopPhone) dom.txtShopPhone.value = contact.phone || '';
+    if (dom.txtShopEmail) dom.txtShopEmail.value = contact.email || DEFAULT_SHOP_CONTACT.email;
+    if (dom.txtShopHours) dom.txtShopHours.value = contact.hours || DEFAULT_SHOP_CONTACT.hours;
+    if (dom.txtShopAddress) dom.txtShopAddress.value = contact.address || DEFAULT_SHOP_CONTACT.address;
 
-    if (dom.lblSlipOrderNum) dom.lblSlipOrderNum.textContent = `Order #${orderId}`;
-    if (dom.lblSlipDate) dom.lblSlipDate.textContent = today;
+    if (prefillOrder) {
+      activeSlipStatus = prefillOrder.status || 'in-progress';
+      activeSlipDate = prefillOrder.date || new Date(prefillOrder.createdAt || Date.now()).toLocaleDateString('en-IN', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+      if (dom.lblSlipOrderNum) dom.lblSlipOrderNum.textContent = `Order #${prefillOrder.orderNum}`;
+      if (dom.lblSlipDate) dom.lblSlipDate.textContent = activeSlipDate;
+      if (dom.txtCustomerName) dom.txtCustomerName.value = prefillOrder.customerName || '';
+      if (dom.txtCustomerPhone) dom.txtCustomerPhone.value = prefillOrder.customerPhone || '';
+      if (dom.txtSlipStyleName) dom.txtSlipStyleName.value = prefillOrder.styleName || '';
+      if (dom.txtSlipFrameDetails) dom.txtSlipFrameDetails.value = prefillOrder.frameDetails || '';
+      if (dom.numFramePrice) dom.numFramePrice.value = prefillOrder.price ?? 0;
+      if (dom.numAdvancePaid) dom.numAdvancePaid.value = prefillOrder.advance ?? 0;
+      if (dom.txtDeliveryEstimate) dom.txtDeliveryEstimate.value = prefillOrder.delivery || 'Tomorrow by 6:00 PM';
+      if (dom.txtSlipNotes) dom.txtSlipNotes.value = prefillOrder.notes || '';
+    } else {
+      activeSlipStatus = 'in-progress';
+      const orderId = generateOrderNumber();
+      activeSlipDate = new Date().toLocaleDateString('en-IN', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
 
-    const sizeInfo = SIZE_NAMES[state.framing.size] || SIZE_NAMES['16x24'];
-    const mouldingName = MOULDING_NAMES[state.framing.moulding] || 'Royal Ornate Gold';
+      if (dom.lblSlipOrderNum) dom.lblSlipOrderNum.textContent = `Order #${orderId}`;
+      if (dom.lblSlipDate) dom.lblSlipDate.textContent = activeSlipDate;
 
-    if (dom.txtSlipStyleName) dom.txtSlipStyleName.value = state.framing.title;
-    if (dom.txtSlipFrameDetails) dom.txtSlipFrameDetails.value = `${sizeInfo.label} — ${mouldingName} (${state.framing.mount} mount)`;
-    if (dom.numFramePrice) dom.numFramePrice.value = state.framing.price;
-    if (dom.numAdvancePaid) dom.numAdvancePaid.value = Math.round(state.framing.price * 0.5);
+      const sizeInfo = SIZE_NAMES[state.framing.size] || SIZE_NAMES['16x24'];
+      const mouldingName = MOULDING_NAMES[state.framing.moulding] || 'Royal Ornate Gold';
+
+      if (dom.txtSlipStyleName) dom.txtSlipStyleName.value = state.framing.title;
+      if (dom.txtSlipFrameDetails) dom.txtSlipFrameDetails.value = `${sizeInfo.label} — ${mouldingName} (${state.framing.mount} mount)`;
+      if (dom.numFramePrice) dom.numFramePrice.value = state.framing.price;
+      if (dom.numAdvancePaid) dom.numAdvancePaid.value = Math.round(state.framing.price * 0.5);
+    }
 
     updateJobSlipCalculations();
 
@@ -785,42 +1123,40 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
 
     if (dom.numBalanceDue) dom.numBalanceDue.value = balance;
 
-    // Update WhatsApp message preview
     if (dom.slipWhatsAppPreviewText) {
       dom.slipWhatsAppPreviewText.textContent = generateWhatsAppJobMessage();
     }
+    renderJobSlipQrCode();
   }
 
   function generateWhatsAppJobMessage() {
-    const custName = (dom.txtCustomerName && dom.txtCustomerName.value.trim()) || 'Valued Customer';
-    const orderNum = (dom.lblSlipOrderNum && dom.lblSlipOrderNum.textContent.replace('Order ', '')) || '#YF-2026';
-    const style = (dom.txtSlipStyleName && dom.txtSlipStyleName.value) || state.framing.title;
-    const frameDetails = (dom.txtSlipFrameDetails && dom.txtSlipFrameDetails.value) || '16x24" Royal Gold';
-    const price = dom.numFramePrice ? dom.numFramePrice.value : state.framing.price;
-    const advance = dom.numAdvancePaid ? dom.numAdvancePaid.value : '0';
-    const balance = dom.numBalanceDue ? dom.numBalanceDue.value : '0';
-    const delivery = (dom.txtDeliveryEstimate && dom.txtDeliveryEstimate.value) || 'Tomorrow by 6:00 PM';
-    const notes = (dom.txtSlipNotes && dom.txtSlipNotes.value.trim()) || 'Standard fine art mounting';
+    const data = buildCurrentSlipOrderData();
+    const receiptUrl = buildDigitalReceiptUrl(data);
+    const notes = data.notes || 'Standard fine art mounting';
 
     return `🖼️ *YASHRAJ FRAMES — JOB SLIP & ORDER CONFIRMATION*
 ----------------------------------------
-*Order No:* ${orderNum}
-*Customer:* ${custName}
-*Artwork Style:* ${style}
-*Frame & Size:* ${frameDetails}
-*Print Media:* Museum Fine Art Canvas
+*Order No:* #${data.orderNum}
+*Customer:* ${data.customerName}
+*Artwork Style:* ${data.styleName}
+*Frame & Size:* ${data.frameDetails}
+*Print Media:* ${data.mediaLabel}
 ----------------------------------------
-*Total Frame Amount:* ₹${price}
-*Advance Received:* ₹${advance}
-*Balance on Delivery:* ₹${balance}
-*Estimated Ready Time:* ${delivery}
+*Total Frame Amount:* ₹${data.price}
+*Advance Received:* ₹${data.advance}
+*Balance on Delivery:* ₹${data.balance}
+*Estimated Ready Time:* ${data.delivery}
 *Workshop Notes:* ${notes}
 ----------------------------------------
+📱 *Digital Receipt & Studio Contact:*
+${receiptUrl}
+
 📍 *Yashraj Frames Studio*
 Thank you for trusting us with your precious memories!`;
   }
 
   function sendWhatsAppJobSlip() {
+    saveCurrentJobSlipAsOrder();
     const rawPhone = dom.txtCustomerPhone ? dom.txtCustomerPhone.value.replace(/[^0-9]/g, '') : '';
     const phone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
     const message = encodeURIComponent(generateWhatsAppJobMessage());
@@ -831,10 +1167,11 @@ Thank you for trusting us with your precious memories!`;
     }
 
     openExternalUrl(waUrl);
-    showToast('Opening WhatsApp with formatted receipt!');
+    showToast('Opening WhatsApp with receipt & digital QR link!');
   }
 
   function copyJobSlipText() {
+    saveCurrentJobSlipAsOrder();
     const text = generateWhatsAppJobMessage();
     copyPromptToClipboard(text, null, false);
     if (dom.lblCopyJobSlip) {
@@ -850,31 +1187,24 @@ Thank you for trusting us with your precious memories!`;
   }
 
   function saveCurrentJobSlipAsOrder() {
-    const custName = (dom.txtCustomerName && dom.txtCustomerName.value.trim()) || 'Valued Customer';
-    const rawPhone = dom.txtCustomerPhone ? dom.txtCustomerPhone.value.trim() : '';
-    const orderNum = (dom.lblSlipOrderNum && dom.lblSlipOrderNum.textContent.replace('Order ', '')) || generateOrderNumber();
-    const style = (dom.txtSlipStyleName && dom.txtSlipStyleName.value) || state.framing.title;
-    const frameDetails = (dom.txtSlipFrameDetails && dom.txtSlipFrameDetails.value) || '16x24" Royal Gold';
-    const price = Number(dom.numFramePrice ? dom.numFramePrice.value : state.framing.price) || 0;
-    const advance = Number(dom.numAdvancePaid ? dom.numAdvancePaid.value : 0) || 0;
-    const balance = Number(dom.numBalanceDue ? dom.numBalanceDue.value : Math.max(0, price - advance)) || 0;
-    const delivery = (dom.txtDeliveryEstimate && dom.txtDeliveryEstimate.value) || 'Tomorrow by 6:00 PM';
-    const notes = (dom.txtSlipNotes && dom.txtSlipNotes.value.trim()) || '';
-
-    const existingIndex = state.shopOrders.findIndex(o => o.orderNum === orderNum);
+    const data = buildCurrentSlipOrderData();
+    const existingIndex = state.shopOrders.findIndex(o => o.orderNum === data.orderNum);
     const orderData = {
-      orderNum,
-      customerName: custName,
-      customerPhone: rawPhone,
-      styleName: style,
+      orderNum: data.orderNum,
+      customerName: data.customerName,
+      customerPhone: data.customerPhone,
+      styleName: data.styleName,
       photoUrl: state.framing.photoUrl,
-      frameDetails,
-      price,
-      advance,
-      balance,
-      delivery,
-      notes,
-      status: 'in-progress',
+      frameDetails: data.frameDetails,
+      mediaLabel: data.mediaLabel,
+      price: data.price,
+      advance: data.advance,
+      balance: data.balance,
+      delivery: data.delivery,
+      notes: data.notes,
+      status: activeSlipStatus || 'in-progress',
+      date: data.date,
+      contact: data.contact,
       createdAt: new Date().toISOString()
     };
 
@@ -884,6 +1214,205 @@ Thank you for trusting us with your precious memories!`;
       state.shopOrders.unshift(orderData);
     }
     saveShopOrders();
+    return orderData;
+  }
+
+  function downloadSlipQrPassPng() {
+    const orderData = saveCurrentJobSlipAsOrder();
+    const receiptUrl = buildDigitalReceiptUrl(orderData);
+    const offscreenQr = document.createElement('canvas');
+
+    QRCode.toCanvas(offscreenQr, receiptUrl, {
+      width: 440,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#111215', light: '#FFFFFF' }
+    }).then(() => {
+      const card = document.createElement('canvas');
+      card.width = 640;
+      card.height = 820;
+      const ctx = card.getContext('2d');
+      if (!ctx) return;
+
+      ctx.fillStyle = '#121318';
+      ctx.fillRect(0, 0, card.width, card.height);
+
+      ctx.strokeStyle = '#D6B879';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(20, 20, card.width - 40, card.height - 40);
+
+      ctx.fillStyle = '#D6B879';
+      ctx.font = 'bold 28px Outfit, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('YASHRAJ FRAMES STUDIO', card.width / 2, 78);
+
+      ctx.fillStyle = '#B0B0B0';
+      ctx.font = '500 18px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('Scan for Digital Order Receipt & Studio Contact', card.width / 2, 112);
+
+      // White card behind QR
+      const qrBoxSize = 460;
+      const qrX = (card.width - qrBoxSize) / 2;
+      const qrY = 148;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(qrX, qrY, qrBoxSize, qrBoxSize);
+      ctx.drawImage(offscreenQr, qrX + 10, qrY + 10, qrBoxSize - 20, qrBoxSize - 20);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 26px "JetBrains Mono", monospace';
+      ctx.fillText(`Order #${orderData.orderNum}`, card.width / 2, 668);
+
+      ctx.fillStyle = '#D6B879';
+      ctx.font = '600 20px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText(`${orderData.customerName}  ·  Total ₹${orderData.price}`, card.width / 2, 708);
+
+      ctx.fillStyle = '#9298A3';
+      ctx.font = '400 16px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText(`Ready Estimate: ${orderData.delivery}`, card.width / 2, 744);
+      ctx.fillText(orderData.contact?.email || DEFAULT_SHOP_CONTACT.email, card.width / 2, 774);
+
+      const dl = document.createElement('a');
+      dl.href = card.toDataURL('image/png');
+      dl.download = `YashrajFrames-${orderData.orderNum}-QR.png`;
+      dl.click();
+      showToast(`Saved QR pass for Order #${orderData.orderNum}`);
+    }).catch((err) => {
+      console.error('Failed exporting QR PNG', err);
+      showToast('Unable to export QR image');
+    });
+  }
+
+  function openClientReceiptPortal(orderData) {
+    if (!dom.clientReceiptPortal || !orderData) return;
+
+    const status = orderData.st || orderData.status || 'in-progress';
+    const statusMap = {
+      'in-progress': { text: 'In Workshop', cls: 'in-progress' },
+      'ready': { text: 'Ready for Pickup', cls: 'ready' },
+      'delivered': { text: 'Delivered & Paid', cls: 'delivered' }
+    };
+    const stInfo = statusMap[status] || statusMap['in-progress'];
+
+    if (dom.receiptPortalStatus) {
+      dom.receiptPortalStatus.textContent = stInfo.text;
+      dom.receiptPortalStatus.className = `receipt-status-pill ${stInfo.cls}`;
+    }
+
+    const orderNum = String(orderData.o || orderData.orderNum || 'YF-2026').replace(/^#/, '');
+    const customer = orderData.n || orderData.customerName || 'Valued Customer';
+    const styleName = orderData.s || orderData.styleName || 'Custom Portrait Artwork';
+    const frameDetails = orderData.f || orderData.frameDetails || 'Handcrafted Studio Frame';
+    const media = orderData.m || orderData.mediaLabel || 'Museum Fine Art Canvas';
+    const total = Number(orderData.t ?? orderData.price ?? 0);
+    const advance = Number(orderData.a ?? orderData.advance ?? 0);
+    const balance = Number(orderData.b ?? orderData.balance ?? Math.max(0, total - advance));
+    const delivery = orderData.e || orderData.delivery || 'Tomorrow by 6:00 PM';
+    const notes = orderData.w ?? orderData.notes ?? '';
+    const dateStr = orderData.d || orderData.date || '';
+
+    const contact = {
+      phone: orderData.sp || orderData.contact?.phone || getShopContactConfig().phone || '',
+      email: orderData.se || orderData.contact?.email || getShopContactConfig().email || DEFAULT_SHOP_CONTACT.email,
+      hours: orderData.sh || orderData.contact?.hours || getShopContactConfig().hours || DEFAULT_SHOP_CONTACT.hours,
+      address: orderData.sa || orderData.contact?.address || getShopContactConfig().address || DEFAULT_SHOP_CONTACT.address
+    };
+
+    if (dom.receiptPortalOrderNum) dom.receiptPortalOrderNum.textContent = `#${orderNum}`;
+    if (dom.receiptPortalDate) dom.receiptPortalDate.textContent = dateStr || 'Verified Copy';
+    if (dom.receiptPortalCustomer) dom.receiptPortalCustomer.textContent = customer;
+    if (dom.receiptPortalStyle) dom.receiptPortalStyle.textContent = styleName;
+    if (dom.receiptPortalFrame) dom.receiptPortalFrame.textContent = frameDetails;
+    if (dom.receiptPortalMedia) dom.receiptPortalMedia.textContent = media;
+    if (dom.receiptPortalDelivery) dom.receiptPortalDelivery.textContent = delivery;
+
+    if (dom.receiptPortalNotesRow && dom.receiptPortalNotes) {
+      if (notes && notes.trim().length > 0) {
+        dom.receiptPortalNotesRow.style.display = 'flex';
+        dom.receiptPortalNotes.textContent = notes;
+      } else {
+        dom.receiptPortalNotesRow.style.display = 'none';
+      }
+    }
+
+    if (dom.receiptPortalTotal) dom.receiptPortalTotal.textContent = `₹${total.toLocaleString('en-IN')}`;
+    if (dom.receiptPortalAdvance) dom.receiptPortalAdvance.textContent = `₹${advance.toLocaleString('en-IN')}`;
+    if (dom.receiptPortalBalance) {
+      dom.receiptPortalBalance.textContent = balance <= 0 ? '₹0 (Paid)' : `₹${balance.toLocaleString('en-IN')}`;
+    }
+
+    if (dom.receiptPortalShopPhone) {
+      dom.receiptPortalShopPhone.textContent = contact.phone ? contact.phone : 'Message us via WhatsApp or Email below';
+    }
+    if (dom.receiptPortalShopEmail) dom.receiptPortalShopEmail.textContent = contact.email;
+    if (dom.receiptPortalShopHours) dom.receiptPortalShopHours.textContent = contact.hours;
+    if (dom.receiptPortalShopAddress) dom.receiptPortalShopAddress.textContent = contact.address;
+
+    const cleanShopDigits = contact.phone.replace(/[^0-9]/g, '');
+    const shopWaNumber = cleanShopDigits.length === 10 ? `91${cleanShopDigits}` : cleanShopDigits;
+    const inquiryMsg = encodeURIComponent(`Hi Yashraj Frames Studio! Checking on my Order #${orderNum} (${customer} - ${frameDetails}).`);
+
+    if (dom.btnReceiptWhatsApp) {
+      dom.btnReceiptWhatsApp.href = shopWaNumber
+        ? `https://wa.me/${shopWaNumber}?text=${inquiryMsg}`
+        : `https://wa.me/?text=${inquiryMsg}`;
+    }
+
+    if (dom.btnReceiptCall) {
+      if (cleanShopDigits.length >= 7) {
+        dom.btnReceiptCall.style.display = 'inline-flex';
+        dom.btnReceiptCall.href = `tel:${contact.phone.replace(/\s+/g, '')}`;
+      } else {
+        dom.btnReceiptCall.style.display = 'none';
+      }
+    }
+
+    if (dom.btnReceiptEmail) {
+      dom.btnReceiptEmail.href = `mailto:${encodeURIComponent(contact.email)}?subject=${encodeURIComponent(`Order #${orderNum} — Yashraj Frames Inquiry`)}&body=${inquiryMsg}`;
+    }
+
+    closeJobSlipModal();
+    document.body.classList.add('receipt-portal-active');
+    dom.clientReceiptPortal.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+
+  function closeClientReceiptPortal() {
+    document.body.classList.remove('receipt-portal-active');
+    if (dom.clientReceiptPortal) dom.clientReceiptPortal.style.display = 'none';
+    if (window.location.hash.startsWith('#receipt')) {
+      window.history.replaceState(null, '', '#home');
+      switchView('home');
+    }
+  }
+
+  function checkAndOpenReceiptFromUrl() {
+    const hash = window.location.hash || '';
+    let token = null;
+    if (hash.startsWith('#receipt')) {
+      const qIdx = hash.indexOf('?');
+      if (qIdx !== -1) {
+        const params = new URLSearchParams(hash.slice(qIdx + 1));
+        token = params.get('d') || params.get('slip');
+      }
+    } else if (window.location.search) {
+      const searchParams = new URLSearchParams(window.location.search);
+      token = searchParams.get('slip') || searchParams.get('d');
+    }
+
+    if (!token) return false;
+    const decoded = decodeReceiptPayload(token);
+    if (!decoded) return false;
+
+    // Sync local workshop status if scanned on the same device
+    const orderKey = String(decoded.o || decoded.orderNum || '').replace(/^#/, '');
+    const localMatch = state.shopOrders.find(o => o.orderNum === orderKey);
+    if (localMatch) {
+      decoded.st = localMatch.status || decoded.st;
+      decoded.b = localMatch.balance ?? decoded.b;
+    }
+
+    openClientReceiptPortal(decoded);
+    return true;
   }
 
   // ==========================================================================
@@ -1320,6 +1849,10 @@ Thank you for trusting us with your precious memories!`;
         </div>
         <div class="order-item-right">
           <span class="order-status-badge ${order.status}">${statusLabel}</span>
+          <button type="button" class="btn-order-action qr-order-btn" data-order="${order.orderNum}" title="Open QR Pass &amp; Digital Receipt">
+            <svg style="width: 13px; height: 13px; display: inline-block; vertical-align: -2px; margin-right: 4px;"><use href="#icon-qr"></use></svg>
+            QR Pass
+          </button>
           ${order.status === 'in-progress' ? `
             <button type="button" class="btn-order-action mark-ready-btn" data-order="${order.orderNum}">Mark Ready</button>
           ` : ''}
@@ -1337,6 +1870,17 @@ Thank you for trusting us with your precious memories!`;
       `;
 
       dom.ordersListGrid.appendChild(card);
+    });
+
+    dom.ordersListGrid.querySelectorAll('.qr-order-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const num = btn.getAttribute('data-order');
+        const order = state.shopOrders.find(o => o.orderNum === num);
+        if (order) {
+          closeShopOrdersModal();
+          openJobSlipModal(order);
+        }
+      });
     });
 
     dom.ordersListGrid.querySelectorAll('.mark-ready-btn').forEach(btn => {
@@ -1544,6 +2088,7 @@ Looking forward to welcoming you! Thank you.`);
     }
     if (dom.profileSavedCount) dom.profileSavedCount.textContent = favCount;
     if (dom.profileHistoryCount) dom.profileHistoryCount.textContent = recCount;
+    if (dom.mobSheetRecentCount) dom.mobSheetRecentCount.textContent = recCount;
   }
 
   // ==========================================================================
@@ -1608,6 +2153,16 @@ Looking forward to welcoming you! Thank you.`);
           referrerPolicy="no-referrer"
           onerror="this.onerror=null; this.src='assets/prompts/royal-portrait.jpg';"
         />
+        <!-- Touch-first Mobile Heart Overlay Button -->
+        <button 
+          type="button" 
+          class="pin-mobile-fav-btn ${isFav ? 'is-fav' : ''}" 
+          data-action="fav-pin" 
+          data-id="${pin.id}" 
+          aria-label="${isFav ? 'Remove from Saved' : 'Save to Favorites'}"
+        >
+          <svg style="width: 17px; height: 17px;"><use href="#icon-heart"></use></svg>
+        </button>
         <div class="pin-hover-scrim">
           <!-- Top Right Signature Pinterest Pill Buttons: AI Auto Take & Copy -->
           <div class="pin-top-actions">
@@ -1657,6 +2212,21 @@ Looking forward to welcoming you! Thank you.`);
           <div class="pin-author-avatar">YF</div>
           <span class="pin-author-name">${escapeHtml(pin.category)} · Studio Preset</span>
         </div>
+      </div>
+
+      <!-- Mobile Touch Quick Actions Strip (Hidden on Desktop Hover Devices) -->
+      <div class="pin-mobile-actions">
+        <button type="button" class="mob-pin-btn mob-pin-ai" data-action="ai-autotake" data-id="${pin.id}">
+          <svg style="width: 13px; height: 13px;"><use href="#icon-sparkles"></use></svg>
+          <span>AI Take</span>
+        </button>
+        <button type="button" class="mob-pin-btn mob-pin-copy" data-action="copy-prompt" data-id="${pin.id}">
+          <svg style="width: 13px; height: 13px;"><use href="#icon-copy"></use></svg>
+          <span class="save-label">Copy</span>
+        </button>
+        <button type="button" class="mob-pin-btn mob-pin-frame" data-action="frame-pin" data-id="${pin.id}" aria-label="Preview Framed">
+          <svg style="width: 14px; height: 14px;"><use href="#icon-frame"></use></svg>
+        </button>
       </div>
     `;
 
@@ -2073,7 +2643,7 @@ Looking forward to welcoming you! Thank you.`);
       if (autoTakeBtn) {
         e.stopPropagation();
         const id = Number(autoTakeBtn.getAttribute('data-id'));
-        const pin = promptList.find(p => p.id === id);
+        const pin = getAllPrompts().find(p => p.id === id);
         if (pin) handleAiAutoTake(pin);
         return;
       }
@@ -2083,7 +2653,7 @@ Looking forward to welcoming you! Thank you.`);
       if (frameBtn) {
         e.stopPropagation();
         const id = Number(frameBtn.getAttribute('data-id'));
-        const pin = promptList.find(p => p.id === id);
+        const pin = getAllPrompts().find(p => p.id === id);
         if (pin) openFramingStudioWithPin(pin);
         return;
       }
@@ -2110,7 +2680,7 @@ Looking forward to welcoming you! Thank you.`);
       if (copyBtn) {
         e.stopPropagation();
         const id = Number(copyBtn.getAttribute('data-id'));
-        const pin = promptList.find(p => p.id === id);
+        const pin = getAllPrompts().find(p => p.id === id);
         if (pin) {
           const ok = await copyPromptToClipboard(pin.prompt, pin.id);
           if (ok) {
@@ -2453,10 +3023,40 @@ Looking forward to welcoming you! Thank you.`);
       dom.shopJobSlipModal.addEventListener('click', (e) => {
         if (e.target === dom.shopJobSlipModal) closeJobSlipModal();
       });
+      dom.shopJobSlipModal.addEventListener('input', (e) => {
+        if (e.target && e.target.matches('input, textarea, select')) {
+          updateJobSlipCalculations();
+        }
+      });
     }
-    const slipForm = document.getElementById('jobSlipForm');
-    if (slipForm) {
-      slipForm.addEventListener('input', updateJobSlipCalculations);
+    if (dom.btnPreviewDigitalReceipt) {
+      dom.btnPreviewDigitalReceipt.addEventListener('click', () => {
+        const savedOrder = saveCurrentJobSlipAsOrder();
+        const url = buildDigitalReceiptUrl(savedOrder);
+        window.history.replaceState(null, '', url);
+        openClientReceiptPortal(savedOrder);
+      });
+    }
+    if (dom.btnCopySlipLink) {
+      dom.btnCopySlipLink.addEventListener('click', () => {
+        const savedOrder = saveCurrentJobSlipAsOrder();
+        const url = buildDigitalReceiptUrl(savedOrder);
+        copyPromptSync(url, null);
+        if (dom.lblCopySlipLink) {
+          dom.lblCopySlipLink.textContent = 'Copied!';
+          setTimeout(() => { dom.lblCopySlipLink.textContent = 'Copy Link'; }, 2000);
+        }
+        showToast('Digital receipt & contact link copied!');
+      });
+    }
+    if (dom.btnDownloadSlipQr) {
+      dom.btnDownloadSlipQr.addEventListener('click', downloadSlipQrPassPng);
+    }
+    if (dom.btnExitReceiptPortal) {
+      dom.btnExitReceiptPortal.addEventListener('click', closeClientReceiptPortal);
+    }
+    if (dom.btnReceiptPrintCopy) {
+      dom.btnReceiptPrintCopy.addEventListener('click', () => window.print());
     }
     if (dom.btnSendWhatsAppSlip) {
       dom.btnSendWhatsAppSlip.addEventListener('click', sendWhatsAppJobSlip);
@@ -2512,12 +3112,93 @@ Looking forward to welcoming you! Thank you.`);
       if (ok) {
         dom.btnModalCopyLabel.textContent = 'Copied!';
         dom.btnModalCopyPrompt.classList.add('copied');
+        if (dom.lblMobModalCopy) dom.lblMobModalCopy.textContent = 'Copied!';
+        if (dom.btnMobModalCopyPrompt) dom.btnMobModalCopyPrompt.classList.add('copied');
         setTimeout(() => {
-          dom.btnModalCopyLabel.textContent = 'Copy Prompt';
+          dom.btnModalCopyLabel.textContent = 'Copy';
           dom.btnModalCopyPrompt.classList.remove('copied');
+          if (dom.lblMobModalCopy) dom.lblMobModalCopy.textContent = 'Copy';
+          if (dom.btnMobModalCopyPrompt) dom.btnMobModalCopyPrompt.classList.remove('copied');
         }, 2000);
       }
     });
+
+    // Mobile Modal Sticky Dock Handlers
+    if (dom.btnMobModalFrame && dom.btnModalViewInFrame) {
+      dom.btnMobModalFrame.addEventListener('click', () => dom.btnModalViewInFrame.click());
+    }
+    if (dom.btnMobModalAutoTake && dom.btnModalAutoTake) {
+      dom.btnMobModalAutoTake.addEventListener('click', () => dom.btnModalAutoTake.click());
+    }
+    if (dom.btnMobModalCopyPrompt && dom.btnModalCopyPrompt) {
+      dom.btnMobModalCopyPrompt.addEventListener('click', () => dom.btnModalCopyPrompt.click());
+    }
+
+    // Mobile Studio Tools Bottom Sheet Handlers
+    function openMobileToolsSheet() {
+      if (!dom.mobileToolsSheet) return;
+      updateHeaderAiIndicator();
+      updateOrdersBadge();
+      updateCounters();
+      if (dom.mobSheetShowroomBadge) {
+        dom.mobSheetShowroomBadge.textContent = state.clientMode ? 'Active' : 'Off';
+        dom.mobSheetShowroomBadge.classList.toggle('is-active', state.clientMode);
+      }
+      dom.mobileToolsSheet.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeMobileToolsSheet() {
+      if (!dom.mobileToolsSheet) return;
+      dom.mobileToolsSheet.classList.remove('active');
+      if (!state.activeModalPin) {
+        document.body.style.overflow = '';
+      }
+    }
+
+    if (dom.btnMobileToolsTrigger) {
+      dom.btnMobileToolsTrigger.addEventListener('click', openMobileToolsSheet);
+    }
+    if (dom.mobToolsCloseBtn) {
+      dom.mobToolsCloseBtn.addEventListener('click', closeMobileToolsSheet);
+    }
+    if (dom.mobSheetDragClose) {
+      dom.mobSheetDragClose.addEventListener('click', closeMobileToolsSheet);
+    }
+    if (dom.mobileToolsSheet) {
+      dom.mobileToolsSheet.addEventListener('click', (e) => {
+        if (e.target === dom.mobileToolsSheet) closeMobileToolsSheet();
+      });
+    }
+    if (dom.mobSheetAiTarget) {
+      dom.mobSheetAiTarget.addEventListener('click', () => {
+        closeMobileToolsSheet();
+        openAiLauncherModal(state.activeModalPin || getAllPrompts()[0]);
+      });
+    }
+    if (dom.mobSheetShowroomMode) {
+      dom.mobSheetShowroomMode.addEventListener('click', () => {
+        toggleClientMode();
+        closeMobileToolsSheet();
+      });
+    }
+    if (dom.mobSheetShopOrders) {
+      dom.mobSheetShopOrders.addEventListener('click', () => {
+        closeMobileToolsSheet();
+        if (dom.btnHeaderShopOrders) dom.btnHeaderShopOrders.click();
+      });
+    }
+    if (dom.mobSheetAddStyle) {
+      dom.mobSheetAddStyle.addEventListener('click', () => {
+        closeMobileToolsSheet();
+        if (dom.btnHeaderAddStyle) dom.btnHeaderAddStyle.click();
+      });
+    }
+    if (dom.mobSheetHistory) {
+      dom.mobSheetHistory.addEventListener('click', () => {
+        closeMobileToolsSheet();
+        switchView('history');
+      });
+    }
 
     // 8. Lightbox Handlers
     dom.lightboxCloseBtn.addEventListener('click', closeLightbox);
@@ -2528,7 +3209,9 @@ Looking forward to welcoming you! Thank you.`);
     // 9. Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        if (dom.presetPickerModal && dom.presetPickerModal.classList.contains('active')) closePresetPicker();
+        if (dom.mobileToolsSheet && dom.mobileToolsSheet.classList.contains('active')) closeMobileToolsSheet();
+        else if (dom.aiAutoTakeModal && dom.aiAutoTakeModal.classList.contains('active')) closeAiLauncherModal();
+        else if (dom.presetPickerModal && dom.presetPickerModal.classList.contains('active')) closePresetPicker();
         else if (dom.addStyleModal && dom.addStyleModal.classList.contains('active')) closeAddStyleModal();
         else if (dom.shopOrdersModal && dom.shopOrdersModal.classList.contains('active')) closeShopOrdersModal();
         else if (dom.shopJobSlipModal && dom.shopJobSlipModal.classList.contains('active')) closeJobSlipModal();
@@ -2545,9 +3228,18 @@ Looking forward to welcoming you! Thank you.`);
 
     // 10. Hash Routing
     window.addEventListener('hashchange', () => {
-      const hash = window.location.hash.replace('#', '');
-      if (hash && ['home', 'explore', 'boards', 'framing', 'saved', 'history'].includes(hash)) {
-        if (state.currentView !== hash) switchView(hash);
+      const hash = window.location.hash || '';
+      if (hash.startsWith('#receipt')) {
+        checkAndOpenReceiptFromUrl();
+        return;
+      }
+      if (document.body.classList.contains('receipt-portal-active')) {
+        document.body.classList.remove('receipt-portal-active');
+        if (dom.clientReceiptPortal) dom.clientReceiptPortal.style.display = 'none';
+      }
+      const cleanHash = hash.replace('#', '');
+      if (cleanHash && ['home', 'explore', 'boards', 'framing', 'saved', 'history'].includes(cleanHash)) {
+        if (state.currentView !== cleanHash) switchView(cleanHash);
       }
     });
   }
@@ -2570,6 +3262,10 @@ Looking forward to welcoming you! Thank you.`);
     updateHeaderAiIndicator();
     renderCategoryChips();
     setupEventListeners();
+
+    if (checkAndOpenReceiptFromUrl()) {
+      return;
+    }
 
     const initialHash = window.location.hash.replace('#', '');
     if (initialHash && ['home', 'explore', 'boards', 'framing', 'saved', 'history'].includes(initialHash)) {
