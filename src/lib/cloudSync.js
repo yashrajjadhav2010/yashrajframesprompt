@@ -274,7 +274,7 @@ export class StudioCloudSync {
   }
 
   async getSessionJwt() {
-    if (this.initPromise) {
+    if (!this.clerkLoaded && this.initPromise) {
       try {
         await this.initPromise;
       } catch {
@@ -297,9 +297,12 @@ export class StudioCloudSync {
     if (!token) {
       return { ok: false, status: 401, data: { error: 'Session token unavailable — please sign out and sign in again' } };
     }
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 15000) : null;
     try {
       const res = await fetch(endpoint, {
         method: options.method || 'GET',
+        signal: controller ? controller.signal : undefined,
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -322,7 +325,12 @@ export class StudioCloudSync {
       }
       return { ok: res.ok, status: res.status, data };
     } catch (err) {
-      return { ok: false, status: 0, data: { error: err?.message || 'Network error' } };
+      const msg = err?.name === 'AbortError'
+        ? `Request timed out (${endpoint})`
+        : (err?.message || 'Network error');
+      return { ok: false, status: 0, data: { error: msg } };
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
@@ -555,7 +563,7 @@ export class StudioCloudSync {
             }
           });
 
-          await this.handleAuthTransition();
+          void this.handleAuthTransition();
         } catch (err) {
           this.clerkLoaded = false;
           this.clerkError = err?.message || 'Unable to load Clerk Sign-In';

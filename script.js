@@ -3272,8 +3272,14 @@ Looking forward to welcoming you! Thank you.`);
       });
     }
 
-    const res = await cloudSync.fetchAdminDashboardData();
-    state.admin.loading = false;
+    let res;
+    try {
+      res = await cloudSync.fetchAdminDashboardData();
+    } catch (err) {
+      res = { ok: false, error: err?.message || 'Unexpected error loading Admin Console' };
+    } finally {
+      state.admin.loading = false;
+    }
 
     if (!res.ok) {
       state.admin.error = res.error || 'Could not load admin dashboard';
