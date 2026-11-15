@@ -6,6 +6,7 @@
 
 import QRCode from 'qrcode';
 import { prompts as importedPrompts, CATEGORIES as importedCategories } from './prompts.js';
+import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUser } from './src/lib/cloudSync.js';
 
 (function () {
   'use strict';
@@ -132,6 +133,19 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
       mount: 'offwhite',
       media: 'canvas',
       wall: 'studio-dark'
+    },
+    admin: {
+      users: [],
+      logs: [],
+      selectedUserId: null,
+      statusFilter: 'all',
+      tierFilter: 'all',
+      sortBy: 'copies_desc',
+      searchQuery: '',
+      needsSqlMigration: false,
+      onlySelfVisible: false,
+      loading: false,
+      realtimeSubscribed: false
     }
   };
 
@@ -175,15 +189,31 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
 
     // Header Action Addons
     btnHeaderAddStyle: document.getElementById('btnHeaderAddStyle'),
+    btnFeedAddStyle: document.getElementById('btnFeedAddStyle'),
+    btnSavedAddStyle: document.getElementById('btnSavedAddStyle'),
     btnHeaderShopOrders: document.getElementById('btnHeaderShopOrders'),
     badgeOrdersCount: document.getElementById('badge-orders-count'),
     btnMobileToolsTrigger: document.getElementById('btnMobileToolsTrigger'),
     badgeMobileTools: document.getElementById('badge-mobile-tools'),
+    btnHeaderAccount: document.getElementById('btnHeaderAccount'),
+    lblHeaderPlanBadge: document.getElementById('lblHeaderPlanBadge'),
+    clerkUserButtonMount: document.getElementById('clerkUserButtonMount'),
+
+    // Profile / Saved Header Account Controls
+    profileAvatarInitials: document.getElementById('profileAvatarInitials'),
+    profileDisplayName: document.getElementById('profileDisplayName'),
+    profileHandleSubtitle: document.getElementById('profileHandleSubtitle'),
+    btnProfileAccountAction: document.getElementById('btnProfileAccountAction'),
+    lblProfileAccountAction: document.getElementById('lblProfileAccountAction'),
 
     // Mobile Studio Tools Bottom Sheet
     mobileToolsSheet: document.getElementById('mobileToolsSheet'),
     mobToolsCloseBtn: document.getElementById('mobToolsCloseBtn'),
     mobSheetDragClose: document.getElementById('mobSheetDragClose'),
+    mobSheetAccountRow: document.getElementById('mobSheetAccountRow'),
+    mobSheetAccountTitle: document.getElementById('mobSheetAccountTitle'),
+    mobSheetAccountSub: document.getElementById('mobSheetAccountSub'),
+    mobSheetPlanBadge: document.getElementById('mobSheetPlanBadge'),
     mobSheetAiTarget: document.getElementById('mobSheetAiTarget'),
     mobSheetAiLabel: document.getElementById('mobSheetAiLabel'),
     mobSheetShowroomMode: document.getElementById('mobSheetShowroomMode'),
@@ -193,6 +223,33 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     mobSheetAddStyle: document.getElementById('mobSheetAddStyle'),
     mobSheetHistory: document.getElementById('mobSheetHistory'),
     mobSheetRecentCount: document.getElementById('mobSheetRecentCount'),
+
+    // Account, Cloud Sync & Subscription Modal
+    accountPlanModal: document.getElementById('accountPlanModal'),
+    accountPlanCloseBtn: document.getElementById('accountPlanCloseBtn'),
+    modalPlanBadge: document.getElementById('modalPlanBadge'),
+    accountSignedOutBox: document.getElementById('accountSignedOutBox'),
+    clerkAuthButtonsRow: document.getElementById('clerkAuthButtonsRow'),
+    btnAccountSignIn: document.getElementById('btnAccountSignIn'),
+    btnAccountSignUp: document.getElementById('btnAccountSignUp'),
+    accountEnvNotice: document.getElementById('accountEnvNotice'),
+    accountSignedInBox: document.getElementById('accountSignedInBox'),
+    accountUserAvatar: document.getElementById('accountUserAvatar'),
+    accountUserInitials: document.getElementById('accountUserInitials'),
+    accountUserName: document.getElementById('accountUserName'),
+    accountUserEmail: document.getElementById('accountUserEmail'),
+    btnManageClerkProfile: document.getElementById('btnManageClerkProfile'),
+    btnAccountSignOut: document.getElementById('btnAccountSignOut'),
+    lblUsageStyles: document.getElementById('lblUsageStyles'),
+    lblUsageOrders: document.getElementById('lblUsageOrders'),
+    lblSyncState: document.getElementById('lblSyncState'),
+    accountSyncActionBar: document.getElementById('accountSyncActionBar'),
+    btnSyncLocalToCloud: document.getElementById('btnSyncLocalToCloud'),
+    lblActivePlanCaption: document.getElementById('lblActivePlanCaption'),
+    subscriptionTiersGrid: document.getElementById('subscriptionTiersGrid'),
+    clerkAuthHostModal: document.getElementById('clerkAuthHostModal'),
+    clerkAuthHostCloseBtn: document.getElementById('clerkAuthHostCloseBtn'),
+    clerkAuthMountNode: document.getElementById('clerkAuthMountNode'),
 
     // Badges & Counters
     badgeRecentCount: document.getElementById('badge-recent-count'),
@@ -234,6 +291,7 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     btnModalLightbox: document.getElementById('btnModalLightbox'),
     btnModalFav: document.getElementById('btnModalFav'),
     btnModalShare: document.getElementById('btnModalShare'),
+    btnModalDeleteCustom: document.getElementById('btnModalDeleteCustom'),
     btnModalViewInFrame: document.getElementById('btnModalViewInFrame'),
     btnModalAutoTake: document.getElementById('btnModalAutoTake'),
     btnModalCopyPrompt: document.getElementById('btnModalCopyPrompt'),
@@ -258,8 +316,53 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     modalBeforeImg: document.getElementById('modalBeforeImg'),
     modalSplitDivider: document.getElementById('modalSplitDivider'),
 
-    // Customizer Elements
+    // Customizer & Subscription Lock Elements
     pinPromptCustomizer: document.getElementById('pinPromptCustomizer'),
+    lblModalLockDesc: document.getElementById('lblModalLockDesc'),
+    btnModalLockAccount: document.getElementById('btnModalLockAccount'),
+    lblModalLockAccountBtn: document.getElementById('lblModalLockAccountBtn'),
+    modalSubscriptionLockedCard: document.getElementById('modalSubscriptionLockedCard'),
+    lblModalLockTitle: document.getElementById('lblModalLockTitle'),
+
+    // Admin Trigger & Console Elements (Strictly visible to yashrajart1999@gmail.com)
+    btnHeaderAdmin: document.getElementById('btnHeaderAdmin'),
+    adminPendingBadge: document.getElementById('adminPendingBadge'),
+    mobSheetAdminRow: document.getElementById('mobSheetAdminRow'),
+    btnAccountOpenAdmin: document.getElementById('btnAccountOpenAdmin'),
+    accountStatusBanner: document.getElementById('accountStatusBanner'),
+    lblAccountStatusTitle: document.getElementById('lblAccountStatusTitle'),
+    lblAccountStatusMsg: document.getElementById('lblAccountStatusMsg'),
+    btnAdminAddStyle: document.getElementById('btnAdminAddStyle'),
+    btnAdminRefresh: document.getElementById('btnAdminRefresh'),
+    btnAdminExportCsv: document.getElementById('btnAdminExportCsv'),
+    btnAdminBackHome: document.getElementById('btnAdminBackHome'),
+    adminKpiTotalUsers: document.getElementById('adminKpiTotalUsers'),
+    adminKpiUsersSub: document.getElementById('adminKpiUsersSub'),
+    adminKpiActiveUsers: document.getElementById('adminKpiActiveUsers'),
+    adminKpiPendingSub: document.getElementById('adminKpiPendingSub'),
+    adminKpiPausedUsers: document.getElementById('adminKpiPausedUsers'),
+    adminKpiTotalCopies: document.getElementById('adminKpiTotalCopies'),
+    adminKpiRedirectsSub: document.getElementById('adminKpiRedirectsSub'),
+    adminSearchInput: document.getElementById('adminSearchInput'),
+    adminStatusTabs: document.getElementById('adminStatusTabs'),
+    adminTierFilter: document.getElementById('adminTierFilter'),
+    adminSortSelect: document.getElementById('adminSortSelect'),
+    adminUsersTableBody: document.getElementById('adminUsersTableBody'),
+    adminInspectorSub: document.getElementById('adminInspectorSub'),
+    adminInspectorEmpty: document.getElementById('adminInspectorEmpty'),
+    adminInspectorBody: document.getElementById('adminInspectorBody'),
+    adminInspName: document.getElementById('adminInspName'),
+    adminInspEmail: document.getElementById('adminInspEmail'),
+    adminInspStatusTag: document.getElementById('adminInspStatusTag'),
+    adminInspCopies: document.getElementById('adminInspCopies'),
+    adminInspRedirects: document.getElementById('adminInspRedirects'),
+    adminInspAssets: document.getElementById('adminInspAssets'),
+    adminInspNoteInput: document.getElementById('adminInspNoteInput'),
+    btnAdminSaveNote: document.getElementById('btnAdminSaveNote'),
+    btnAdminInspApprove: document.getElementById('btnAdminInspApprove'),
+    btnAdminInspPause: document.getElementById('btnAdminInspPause'),
+    adminUserSpecificLogs: document.getElementById('adminUserSpecificLogs'),
+    adminRecentLogsList: document.getElementById('adminRecentLogsList'),
 
     // Framing Studio Elements
     fileCustomerPhotoInput: document.getElementById('fileCustomerPhotoInput'),
@@ -432,6 +535,7 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     } catch (e) {
       console.warn('Unable to save custom styles', e);
     }
+    updateAccountAndSubscriptionUI();
   }
 
   function saveShopOrders() {
@@ -441,6 +545,7 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
       console.warn('Unable to save shop orders', e);
     }
     updateOrdersBadge();
+    updateAccountAndSubscriptionUI();
   }
 
   function updateOrdersBadge() {
@@ -467,6 +572,17 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     }
   }
 
+  function syncPreferencesToCloud() {
+    if (cloudSync && cloudSync.user && cloudSync.supabase) {
+      cloudSync.upsertPreferences({
+        favorites: Array.from(state.favorites),
+        recentIds: state.recentIds,
+        defaultAiApp: state.defaultAiApp,
+        shopContact: getShopContactConfig()
+      });
+    }
+  }
+
   function saveFavorites() {
     try {
       localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(Array.from(state.favorites)));
@@ -474,6 +590,7 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
       console.warn('Unable to save favorites', e);
     }
     updateCounters();
+    syncPreferencesToCloud();
   }
 
   function saveRecent() {
@@ -483,6 +600,7 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
       console.warn('Unable to save recent list', e);
     }
     updateCounters();
+    syncPreferencesToCloud();
   }
 
   function recordRecent(pinId) {
@@ -532,10 +650,50 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
   }
 
   // ==========================================================================
+  // SUBSCRIPTION ACCESS GATE & ADMIN HELPER
+  // ==========================================================================
+  function isAdminUser() {
+    return typeof cloudSync !== 'undefined' && isClerkAdminUser(cloudSync.user);
+  }
+
+  function getPromptAccessState() {
+    if (typeof cloudSync === 'undefined' || !cloudSync.user) {
+      return { allowed: false, status: 'signed_out', isAdmin: false };
+    }
+    const plan = cloudSync.getActivePlanMeta();
+    return {
+      allowed: Boolean(plan.isAccessAllowed),
+      status: plan.status || 'pending',
+      isAdmin: Boolean(plan.isAdmin)
+    };
+  }
+
+  function isPromptAccessAllowed() {
+    return getPromptAccessState().allowed;
+  }
+
+  function enforceLockedPromptAction(actionLabel = 'Prompt access') {
+    const access = getPromptAccessState();
+    if (access.allowed) return true;
+    if (access.status === 'signed_out') {
+      showToast(`Sign in and get Studio Admin approval to unlock ${actionLabel}.`);
+      openClerkAuthModal('signIn');
+      return false;
+    }
+    const msg = access.status === 'pending'
+      ? `${actionLabel} locked — your account is awaiting manual approval from Studio Admin.`
+      : `${actionLabel} locked — your access is currently paused by Studio Admin.`;
+    showToast(msg);
+    openAccountPlanModal();
+    return false;
+  }
+
+  // ==========================================================================
   // CLIPBOARD COPY
   // ==========================================================================
   async function copyPromptToClipboard(promptText, pinId, notify = true) {
     if (!promptText) return false;
+    if (pinId && !enforceLockedPromptAction('Prompt copy')) return false;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(promptText);
@@ -550,7 +708,18 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
         document.execCommand('copy');
         document.body.removeChild(textarea);
       }
-      if (pinId) recordRecent(pinId);
+      if (pinId) {
+        recordRecent(pinId);
+        const pin = getAllPrompts().find(p => Number(p.id) === Number(pinId));
+        if (typeof cloudSync !== 'undefined' && cloudSync.user) {
+          cloudSync.recordPromptUsage({
+            pinId: Number(pinId),
+            pinTitle: pin?.title || `Style #${pinId}`,
+            category: pin?.category || '',
+            actionType: 'copy'
+          });
+        }
+      }
       if (notify) showToast('Prompt copied to clipboard!');
       return true;
     } catch (e) {
@@ -563,7 +732,8 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
   // ==========================================================================
   // AI AUTO TAKE ENGINE (Takes prompt directly to external AI App without copy-paste)
   // ==========================================================================
-  function copyPromptSync(promptText, pinId) {
+  function copyPromptSync(promptText, pinId, options = {}) {
+    if (pinId && !enforceLockedPromptAction('Prompt copy')) return false;
     const clean = cleanPromptForAi(promptText);
     let copied = false;
     try {
@@ -590,7 +760,18 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
       navigator.clipboard.writeText(clean).catch(() => {});
     }
 
-    if (pinId) recordRecent(pinId);
+    if (pinId) {
+      recordRecent(pinId);
+      if (!options.skipTelemetry && typeof cloudSync !== 'undefined' && cloudSync.user) {
+        const pin = getAllPrompts().find(p => Number(p.id) === Number(pinId));
+        cloudSync.recordPromptUsage({
+          pinId: Number(pinId),
+          pinTitle: pin?.title || `Style #${pinId}`,
+          category: pin?.category || '',
+          actionType: 'copy'
+        });
+      }
+    }
     return copied;
   }
 
@@ -630,6 +811,7 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
   }
 
   function openAiLauncherModal(pin) {
+    if (!enforceLockedPromptAction('AI Auto Take')) return;
     if (!pin) return;
     state.activeTargetPin = pin;
     if (dom.aiLauncherPromptPreview) {
@@ -652,11 +834,22 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
   }
 
   function executeAiAutoTake(pin, targetKey) {
+    if (!enforceLockedPromptAction('AI Auto Take redirect')) return;
     if (!pin || !pin.prompt) return;
     const cleanPrompt = cleanPromptForAi(pin.prompt);
 
     // Synchronous clipboard copy BEFORE opening tab so browser user activation is preserved
-    copyPromptSync(cleanPrompt, pin.id);
+    copyPromptSync(cleanPrompt, pin.id, { skipTelemetry: true });
+
+    if (typeof cloudSync !== 'undefined' && cloudSync.user) {
+      cloudSync.recordPromptUsage({
+        pinId: pin.id,
+        pinTitle: pin.title,
+        category: pin.category,
+        actionType: 'ai_redirect',
+        aiTarget: targetKey
+      });
+    }
 
     const app = AI_APPS[targetKey] || AI_APPS.chatgpt;
 
@@ -690,6 +883,7 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
   }
 
   function handleAiAutoTake(pin) {
+    if (!enforceLockedPromptAction('AI Auto Take')) return;
     if (!pin) return;
     state.activeTargetPin = pin;
 
@@ -737,8 +931,7 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
 
     // Refresh modal if currently open
     if (state.activeModalPin) {
-      if (dom.modalPromptCard) dom.modalPromptCard.style.display = state.clientMode ? 'none' : 'block';
-      if (dom.modalClientShowroomCard) dom.modalClientShowroomCard.style.display = state.clientMode ? 'block' : 'none';
+      applyModalPromptAccessUI(state.activeModalPin);
     }
   }
 
@@ -880,6 +1073,7 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
   }
 
   function handleFramingAiAutoTake() {
+    if (!enforceLockedPromptAction('AI Auto Take')) return;
     const allPins = getAllPrompts();
     const pin = state.framing.activePinId
       ? allPins.find(p => p.id === state.framing.activePinId)
@@ -899,6 +1093,383 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     };
 
     handleAiAutoTake(tailoredPin);
+  }
+
+  // ==========================================================================
+  // CLERK AUTHENTICATION & SUPABASE REALTIME SYNC
+  // ==========================================================================
+  const cloudSync = new StudioCloudSync({
+    onAuthChange: () => {
+      updateAccountAndSubscriptionUI();
+    },
+    onAuthSuccess: () => {
+      closeClerkAuthModal();
+      showToast('Signed in & syncing with studio cloud');
+    },
+    onCloudBootstrap: async ({ styles, orders, preferences }) => {
+      // Merge cloud custom styles + push any local-only styles
+      const remoteStyleMap = new Map((styles || []).map(s => [Number(s.id), s]));
+      const localOnlyStyles = state.customStyles.filter(s => !remoteStyleMap.has(Number(s.id)));
+      const mergedStyles = [...(styles || []), ...localOnlyStyles].sort(
+        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+      );
+      state.customStyles = mergedStyles;
+      saveCustomStyles();
+      if (localOnlyStyles.length > 0) {
+        await cloudSync.upsertStylesBatch(localOnlyStyles);
+      }
+
+      // Merge cloud orders + push local-only orders
+      const remoteOrderMap = new Map((orders || []).map(o => [String(o.orderNum), o]));
+      const localOnlyOrders = state.shopOrders.filter(o => !remoteOrderMap.has(String(o.orderNum)));
+      const mergedOrders = [...(orders || []), ...localOnlyOrders].sort(
+        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+      );
+      state.shopOrders = mergedOrders;
+      saveShopOrders();
+      if (localOnlyOrders.length > 0) {
+        await cloudSync.upsertOrdersBatch(localOnlyOrders);
+      }
+
+      // Apply cloud preferences if available
+      if (preferences) {
+        if (Array.isArray(preferences.favorites)) {
+          preferences.favorites.forEach(id => state.favorites.add(Number(id)));
+          try {
+            localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(Array.from(state.favorites)));
+          } catch {}
+        }
+        if (Array.isArray(preferences.recent_ids) && state.recentIds.length === 0) {
+          state.recentIds = preferences.recent_ids.map(Number);
+          try {
+            localStorage.setItem(STORAGE_KEYS.RECENT, JSON.stringify(state.recentIds));
+          } catch {}
+        }
+        if (preferences.default_ai_app && !state.defaultAiApp) {
+          state.defaultAiApp = preferences.default_ai_app;
+          try {
+            localStorage.setItem(STORAGE_KEYS.DEFAULT_AI_APP, state.defaultAiApp);
+          } catch {}
+          updateHeaderAiIndicator();
+        }
+        if (preferences.shop_contact && Object.keys(preferences.shop_contact).length > 0) {
+          try {
+            localStorage.setItem(STORAGE_KEYS.SHOP_CONTACT, JSON.stringify({ ...getShopContactConfig(), ...preferences.shop_contact }));
+          } catch {}
+        }
+      }
+
+      refreshCurrentView();
+      updateCounters();
+      updateAccountAndSubscriptionUI();
+    },
+    onStyleRealtime: ({ eventType, style, oldId }) => {
+      if (eventType === 'DELETE' && oldId) {
+        const before = state.customStyles.length;
+        state.customStyles = state.customStyles.filter(s => Number(s.id) !== Number(oldId));
+        if (state.customStyles.length !== before) {
+          saveCustomStyles();
+          refreshCurrentView();
+        }
+        return;
+      }
+      if ((eventType === 'INSERT' || eventType === 'UPDATE') && style) {
+        const idx = state.customStyles.findIndex(s => Number(s.id) === Number(style.id));
+        if (idx >= 0) {
+          state.customStyles[idx] = style;
+        } else {
+          state.customStyles.unshift(style);
+          showToast(`Synced "${style.title}" from another device`);
+        }
+        saveCustomStyles();
+        refreshCurrentView();
+      }
+    },
+    onOrderRealtime: ({ eventType, order, oldOrderNum }) => {
+      if (eventType === 'DELETE' && oldOrderNum) {
+        state.shopOrders = state.shopOrders.filter(o => o.orderNum !== oldOrderNum);
+        saveShopOrders();
+        if (dom.shopOrdersModal && dom.shopOrdersModal.classList.contains('active')) renderShopOrders();
+        return;
+      }
+      if ((eventType === 'INSERT' || eventType === 'UPDATE') && order) {
+        const idx = state.shopOrders.findIndex(o => o.orderNum === order.orderNum);
+        if (idx >= 0) {
+          state.shopOrders[idx] = order;
+        } else {
+          state.shopOrders.unshift(order);
+        }
+        saveShopOrders();
+        if (dom.shopOrdersModal && dom.shopOrdersModal.classList.contains('active')) renderShopOrders();
+      }
+    },
+    onPreferencesRealtime: (prefs) => {
+      if (!prefs) return;
+      if (Array.isArray(prefs.favorites)) {
+        state.favorites = new Set(prefs.favorites.map(Number));
+        try {
+          localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(Array.from(state.favorites)));
+        } catch {}
+        refreshCurrentView();
+      }
+      if (Array.isArray(prefs.recent_ids)) {
+        state.recentIds = prefs.recent_ids.map(Number);
+        try {
+          localStorage.setItem(STORAGE_KEYS.RECENT, JSON.stringify(state.recentIds));
+        } catch {}
+        updateCounters();
+      }
+    }
+  });
+
+  function closeClerkAuthModal() {
+    cloudSync.unmountAuthComponent();
+    if (dom.clerkAuthHostModal) {
+      dom.clerkAuthHostModal.classList.remove('active');
+    }
+  }
+
+  async function openClerkAuthModal(mode = 'signIn') {
+    if (!dom.clerkAuthHostModal || !dom.clerkAuthMountNode) {
+      return mode === 'signUp' ? cloudSync.openSignUp() : cloudSync.openSignIn();
+    }
+    dom.clerkAuthHostModal.classList.add('active');
+    const res = mode === 'signUp'
+      ? await cloudSync.openSignUp(dom.clerkAuthMountNode)
+      : await cloudSync.openSignIn(dom.clerkAuthMountNode);
+    if (!res.ok) {
+      closeClerkAuthModal();
+      showToast(res.reason === 'missing_key'
+        ? 'Configure VITE_CLERK_PUBLISHABLE_KEY to launch Clerk Sign In'
+        : `Clerk Sign In unavailable: ${res.reason}`);
+    }
+    return res;
+  }
+
+  function updateAccountAndSubscriptionUI() {
+    const status = cloudSync.getConfigStatus();
+    const user = cloudSync.user;
+    const plan = cloudSync.getActivePlanMeta();
+    const adminAllowed = isAdminUser();
+    const access = getPromptAccessState();
+    const isLocked = !access.allowed;
+
+    // Toggle document-wide access lock and admin-only styling classes
+    document.body.classList.toggle('subscription-locked', isLocked);
+    document.body.classList.toggle('is-admin-user', adminAllowed);
+
+    // Admin entrypoints — STRICTLY shown only when logged in as yashrajart1999@gmail.com
+    if (dom.btnHeaderAdmin) {
+      dom.btnHeaderAdmin.style.display = adminAllowed ? 'inline-flex' : 'none';
+      dom.btnHeaderAdmin.classList.toggle('active', state.currentView === 'admin');
+    }
+    if (dom.mobSheetAdminRow) {
+      dom.mobSheetAdminRow.style.display = adminAllowed ? 'flex' : 'none';
+    }
+    if (dom.btnAccountOpenAdmin) {
+      dom.btnAccountOpenAdmin.style.display = adminAllowed ? 'inline-flex' : 'none';
+    }
+
+    if (adminAllowed && !state.admin.realtimeSubscribed) {
+      loadAdminDashboard(true);
+    } else if (!adminAllowed && state.currentView === 'admin') {
+      switchView('home');
+    }
+
+    // Header pill + Clerk UserButton mount
+    if (dom.lblHeaderPlanBadge) {
+      if (!user) {
+        dom.lblHeaderPlanBadge.textContent = 'Sign In';
+      } else if (plan.status === 'paused') {
+        dom.lblHeaderPlanBadge.textContent = `${plan.badge} · Paused`;
+      } else if (plan.status === 'pending') {
+        dom.lblHeaderPlanBadge.textContent = `${plan.badge} · Pending`;
+      } else {
+        dom.lblHeaderPlanBadge.textContent = adminAllowed ? `${plan.badge} · Admin` : `${plan.badge} · Synced`;
+      }
+    }
+    if (dom.btnHeaderAccount) {
+      dom.btnHeaderAccount.classList.toggle('is-signed-in', Boolean(user));
+      dom.btnHeaderAccount.classList.toggle('is-paused', Boolean(user && plan.status === 'paused'));
+      dom.btnHeaderAccount.classList.toggle('is-pending', Boolean(user && plan.status === 'pending'));
+    }
+    if (dom.clerkUserButtonMount) {
+      if (user && status.clerkConfigured) {
+        dom.clerkUserButtonMount.style.display = 'flex';
+        cloudSync.mountUserButton(dom.clerkUserButtonMount);
+      } else {
+        cloudSync.unmountUserButton(dom.clerkUserButtonMount);
+        dom.clerkUserButtonMount.style.display = 'none';
+      }
+    }
+
+    // Saved View Profile Lockup
+    const displayName = user
+      ? (user.fullName || user.firstName || user.username || 'Yashraj Studio Member')
+      : 'Yashraj Frames Studio';
+    const email = user
+      ? (user.primaryEmailAddress?.emailAddress || (user.emailAddresses && user.emailAddresses[0]?.emailAddress) || '')
+      : '';
+    const initials = displayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(w => w[0].toUpperCase())
+      .join('') || 'YF';
+
+    if (dom.profileAvatarInitials) dom.profileAvatarInitials.textContent = initials;
+    if (dom.profileDisplayName) dom.profileDisplayName.textContent = displayName;
+    if (dom.profileHandleSubtitle) {
+      const subSuffix = isLocked
+        ? ` · ${plan.status === 'pending' ? 'Pending Admin Approval' : 'Subscription Paused'}`
+        : ` (${status.realtimeConnected ? 'Live Sync' : 'Cloud'})`;
+      dom.profileHandleSubtitle.textContent = user
+        ? `${email || 'Clerk Verified'} · ${plan.name}${subSuffix}`
+        : '@yashrajframes · Sign in to sync mobile & desktop';
+    }
+    if (dom.lblProfileAccountAction) {
+      dom.lblProfileAccountAction.textContent = user ? `${plan.name} (${plan.badge})` : 'Sign In & Sync';
+    }
+
+    // Mobile Bottom Sheet Account Row
+    if (dom.mobSheetAccountTitle) {
+      dom.mobSheetAccountTitle.textContent = user ? displayName : 'Studio Account & Cloud Sync';
+    }
+    if (dom.mobSheetAccountSub) {
+      dom.mobSheetAccountSub.textContent = user
+        ? (isLocked
+          ? `${plan.status === 'pending' ? 'Pending Approval' : 'Paused by Admin'} · Prompts Locked`
+          : `${plan.name} · ${status.realtimeConnected ? 'Realtime sync active' : 'Cloud connected'}`)
+        : 'Sign in to sync styles from mobile & unlock Pro';
+    }
+    if (dom.mobSheetPlanBadge) {
+      dom.mobSheetPlanBadge.textContent = user
+        ? (isLocked ? plan.status.toUpperCase() : plan.badge)
+        : 'Sign In';
+    }
+
+    // Account & Subscription Modal
+    if (dom.modalPlanBadge) {
+      dom.modalPlanBadge.textContent = user && isLocked ? `${plan.badge} · ${plan.status.toUpperCase()}` : plan.badge;
+    }
+    if (dom.lblActivePlanCaption) {
+      const statusLabel = plan.status === 'paused' ? 'Paused' : (plan.status === 'pending' ? 'Pending Approval' : 'Active');
+      dom.lblActivePlanCaption.textContent = user
+        ? `Current plan: ${plan.name} (${plan.priceLabel}) · ${statusLabel}`
+        : `Current plan: ${plan.name} (${plan.priceLabel})`;
+    }
+    if (dom.accountSignedOutBox && dom.accountSignedInBox) {
+      dom.accountSignedOutBox.style.display = user ? 'none' : 'block';
+      dom.accountSignedInBox.style.display = user ? 'flex' : 'none';
+    }
+    if (dom.clerkAuthButtonsRow && dom.accountEnvNotice) {
+      dom.clerkAuthButtonsRow.style.display = status.clerkConfigured ? 'flex' : 'none';
+      dom.accountEnvNotice.style.display = (!status.clerkConfigured || !status.supabaseConfigured) ? 'block' : 'none';
+    }
+    if (dom.accountStatusBanner) {
+      if (user && isLocked) {
+        dom.accountStatusBanner.style.display = 'flex';
+        dom.accountStatusBanner.classList.toggle('is-pending', plan.status === 'pending');
+        if (dom.lblAccountStatusTitle) {
+          dom.lblAccountStatusTitle.textContent = plan.status === 'pending'
+            ? 'Pending Manual Admin Approval'
+            : 'Access Paused — Prompts & Redirects Locked';
+        }
+        if (dom.lblAccountStatusMsg) {
+          dom.lblAccountStatusMsg.textContent = plan.status === 'pending'
+            ? `Your account is queued for manual verification by Studio Admin (${ADMIN_EMAIL}). Once approved, prompt viewing, copying, and AI Auto Take unlock automatically.`
+            : `Prompt viewing, copying, and AI Auto Take redirects are disabled while paused. Contact Studio Admin (${ADMIN_EMAIL}) to reactivate.`;
+        }
+      } else {
+        dom.accountStatusBanner.style.display = 'none';
+      }
+    }
+
+    if (user) {
+      if (dom.accountUserName) dom.accountUserName.textContent = displayName;
+      if (dom.accountUserEmail) dom.accountUserEmail.textContent = email || 'Clerk Verified Account';
+      if (dom.accountUserInitials && dom.accountUserAvatar) {
+        if (user.imageUrl) {
+          dom.accountUserAvatar.src = user.imageUrl;
+          dom.accountUserAvatar.style.display = 'block';
+          dom.accountUserInitials.style.display = 'none';
+        } else {
+          dom.accountUserAvatar.style.display = 'none';
+          dom.accountUserInitials.style.display = 'flex';
+          dom.accountUserInitials.textContent = initials;
+        }
+      }
+      if (dom.lblUsageStyles) {
+        dom.lblUsageStyles.textContent = `${state.customStyles.length} / ${plan.styleLimit}`;
+      }
+      if (dom.lblUsageOrders) {
+        dom.lblUsageOrders.textContent = `${state.shopOrders.length} / ${plan.orderLimit}`;
+      }
+      if (dom.lblSyncState) {
+        dom.lblSyncState.textContent = status.supabaseConfigured
+          ? (status.realtimeConnected ? 'Live (Realtime)' : 'Connected')
+          : 'Supabase Not Set';
+      }
+    }
+
+    if (dom.subscriptionTiersGrid) {
+      dom.subscriptionTiersGrid.querySelectorAll('.plan-tier-card').forEach(card => {
+        const tier = card.getAttribute('data-tier');
+        const isCurrent = tier === plan.id;
+        card.classList.toggle('is-current', isCurrent);
+        const stateBadge = card.querySelector('[data-tier-state]');
+        if (stateBadge) {
+          if (isCurrent) {
+            stateBadge.textContent = plan.status === 'paused'
+              ? 'Current Plan (Paused)'
+              : (plan.status === 'pending' ? 'Pending Approval' : 'Active Plan');
+          } else {
+            stateBadge.textContent = tier === 'free' ? 'Starter Tier' : 'Ready for Approval';
+          }
+        }
+        const reqBtn = card.querySelector('[data-request-tier]');
+        if (reqBtn) {
+          if (!user) {
+            reqBtn.disabled = false;
+            reqBtn.textContent = tier === 'studio_pro' ? 'Request Pro Approval' : 'Request Enterprise Approval';
+          } else if (isCurrent && plan.status === 'active') {
+            reqBtn.disabled = true;
+            reqBtn.textContent = 'Approved & Active';
+          } else if (isCurrent && plan.status === 'pending') {
+            reqBtn.disabled = true;
+            reqBtn.textContent = 'Awaiting Admin Approval';
+          } else {
+            reqBtn.disabled = false;
+            reqBtn.textContent = tier === 'studio_pro' ? 'Request Pro Approval' : 'Request Enterprise Approval';
+          }
+        }
+      });
+    }
+
+    // Live-lock or unlock open pin modal immediately if Realtime changed subscription status
+    if (state.activeModalPin) {
+      applyModalPromptAccessUI(state.activeModalPin);
+    }
+
+    // If user just signed in as admin while #admin is in URL hash, navigate straight there
+    if (adminAllowed && window.location.hash === '#admin' && state.currentView !== 'admin') {
+      switchView('admin');
+    }
+  }
+
+  function openAccountPlanModal() {
+    if (!dom.accountPlanModal) return;
+    updateAccountAndSubscriptionUI();
+    dom.accountPlanModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeAccountPlanModal() {
+    if (!dom.accountPlanModal) return;
+    dom.accountPlanModal.classList.remove('active');
+    if (!state.activeModalPin) {
+      document.body.style.overflow = '';
+    }
   }
 
   // ==========================================================================
@@ -935,6 +1506,7 @@ import { prompts as importedPrompts, CATEGORIES as importedCategories } from './
     } catch (e) {
       // ignore storage write error
     }
+    syncPreferencesToCloud();
     return config;
   }
 
@@ -1214,6 +1786,9 @@ Thank you for trusting us with your precious memories!`;
       state.shopOrders.unshift(orderData);
     }
     saveShopOrders();
+    if (cloudSync && cloudSync.user && cloudSync.supabase) {
+      cloudSync.upsertOrder(orderData);
+    }
     return orderData;
   }
 
@@ -1674,6 +2249,10 @@ Thank you for trusting us with your precious memories!`;
   // ADD CUSTOM STYLE & JSON BACKUP
   // ==========================================================================
   function openAddStyleModal() {
+    if (!isAdminUser()) {
+      showToast(`Add Style is restricted to Studio Admin (${ADMIN_EMAIL})`);
+      return;
+    }
     if (!dom.addStyleModal) return;
     if (dom.addStyleForm) dom.addStyleForm.reset();
     if (dom.newStyleImagePreviewContainer) dom.newStyleImagePreviewContainer.style.display = 'none';
@@ -1688,9 +2267,15 @@ Thank you for trusting us with your precious memories!`;
     document.body.style.overflow = '';
   }
 
-  function handleSaveCustomStyle() {
+  async function handleSaveCustomStyle() {
+    if (!isAdminUser()) {
+      showToast(`Saving custom styles is restricted to Studio Admin (${ADMIN_EMAIL})`);
+      closeAddStyleModal();
+      return;
+    }
     const title = dom.txtNewStyleTitle ? dom.txtNewStyleTitle.value.trim() : '';
     const category = dom.selNewStyleCategory ? dom.selNewStyleCategory.value : 'Other';
+    const aspectRatio = dom.selNewStyleAspect ? dom.selNewStyleAspect.value : '2:3';
     const prompt = dom.txtNewStylePrompt ? dom.txtNewStylePrompt.value.trim() : '';
     const desc = dom.txtNewStyleDescription ? dom.txtNewStyleDescription.value.trim() : '';
     const tagsRaw = dom.txtNewStyleTags ? dom.txtNewStyleTags.value.trim() : '';
@@ -1712,10 +2297,20 @@ Thank you for trusting us with your precious memories!`;
       return;
     }
 
+    const plan = cloudSync.getActivePlanMeta();
+    if (cloudSync.user && state.customStyles.length >= plan.styleLimit) {
+      showToast(`Reached ${plan.name} limit (${plan.styleLimit} styles). Upgrade in Account & Plan.`);
+      closeAddStyleModal();
+      openAccountPlanModal();
+      return;
+    }
+
+    const uniqueNumericId = Date.now() * 100 + Math.floor(Math.random() * 100);
     const newStyle = {
-      id: Date.now(),
+      id: uniqueNumericId,
       title,
       category,
+      aspectRatio,
       prompt,
       referenceImage: image,
       thumbnail: image,
@@ -1729,11 +2324,43 @@ Thank you for trusting us with your precious memories!`;
     state.customStyles.unshift(newStyle);
     saveCustomStyles();
     closeAddStyleModal();
-    renderFeed();
-    showToast(`Saved "${title}" to studio library!`);
+    refreshCurrentView();
+
+    if (cloudSync.user && cloudSync.supabase) {
+      const res = await cloudSync.upsertStyle(newStyle);
+      showToast(res.synced ? `Saved & synced "${title}" to cloud!` : `Saved "${title}" locally (cloud sync retry queued)`);
+    } else {
+      showToast(`Saved "${title}" locally! Sign in to sync across mobile & desktop.`);
+    }
+  }
+
+  async function deleteCustomStyle(pinId) {
+    if (!isAdminUser()) {
+      showToast(`Deleting custom styles is restricted to Studio Admin (${ADMIN_EMAIL})`);
+      return;
+    }
+    const id = Number(pinId);
+    const target = state.customStyles.find(s => Number(s.id) === id);
+    if (!target) return;
+
+    state.customStyles = state.customStyles.filter(s => Number(s.id) !== id);
+    saveCustomStyles();
+    closePinModal();
+    refreshCurrentView();
+
+    if (cloudSync.user && cloudSync.supabase) {
+      await cloudSync.deleteStyle(id);
+      showToast(`Deleted "${target.title}" across synced devices`);
+    } else {
+      showToast(`Deleted "${target.title}"`);
+    }
   }
 
   function exportCustomStylesJson() {
+    if (!isAdminUser()) {
+      showToast(`Exporting custom styles is restricted to Studio Admin (${ADMIN_EMAIL})`);
+      return;
+    }
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.customStyles, null, 2));
     const dlAnchorElem = document.createElement('a');
     dlAnchorElem.setAttribute("href", dataStr);
@@ -1743,22 +2370,32 @@ Thank you for trusting us with your precious memories!`;
   }
 
   function importCustomStylesJson(file) {
+    if (!isAdminUser()) {
+      showToast(`Importing custom styles is restricted to Studio Admin (${ADMIN_EMAIL})`);
+      return;
+    }
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const imported = JSON.parse(e.target.result);
         if (Array.isArray(imported)) {
-          const existingIds = new Set(state.customStyles.map(s => s.id));
+          const existingIds = new Set(state.customStyles.map(s => Number(s.id)));
+          const added = [];
           imported.forEach(item => {
-            if (!existingIds.has(item.id)) {
-              state.customStyles.unshift(item);
+            if (!existingIds.has(Number(item.id))) {
+              const normalized = { ...item, id: Number(item.id) || (Date.now() * 100 + Math.floor(Math.random() * 100)), isCustom: true };
+              state.customStyles.unshift(normalized);
+              added.push(normalized);
             }
           });
           saveCustomStyles();
-          renderFeed();
+          refreshCurrentView();
           closeAddStyleModal();
-          showToast(`Imported ${imported.length} styles successfully!`);
+          if (added.length > 0 && cloudSync.user && cloudSync.supabase) {
+            await cloudSync.upsertStylesBatch(added);
+          }
+          showToast(`Imported ${added.length} styles successfully!`);
         } else {
           showToast('Invalid backup file format');
         }
@@ -1921,6 +2558,9 @@ Thank you for trusting us with your precious memories!`;
         order.balance = 0;
       }
       saveShopOrders();
+      if (cloudSync && cloudSync.user && cloudSync.supabase) {
+        cloudSync.upsertOrder(order);
+      }
       renderShopOrders();
       showToast(`Order #${orderNum} marked as ${newStatus}!`);
     }
@@ -2031,6 +2671,12 @@ Looking forward to welcoming you! Thank you.`);
     // Normalise view names
     let normalized = viewName;
     if (normalized === 'explore') normalized = 'home';
+
+    // Strict email guard for Admin Console (only yashrajart1999@gmail.com)
+    if (normalized === 'admin' && !isAdminUser()) {
+      normalized = 'home';
+    }
+
     state.currentView = normalized;
 
     // Header pills
@@ -2042,6 +2688,10 @@ Looking forward to welcoming you! Thank you.`);
         pill.classList.remove('active');
       }
     });
+
+    if (dom.btnHeaderAdmin) {
+      dom.btnHeaderAdmin.classList.toggle('active', normalized === 'admin');
+    }
 
     // Mobile nav
     dom.mobileNavItems.forEach(item => {
@@ -2105,12 +2755,13 @@ Looking forward to welcoming you! Thank you.`);
     // Filter by Search
     if (state.searchQuery && state.searchQuery.trim().length > 0) {
       const q = state.searchQuery.trim().toLowerCase();
+      const canSearchPrompt = isPromptAccessAllowed();
       list = list.filter(p => {
         const titleMatch = p.title.toLowerCase().includes(q);
         const catMatch = p.category.toLowerCase().includes(q);
         const descMatch = p.description.toLowerCase().includes(q);
         const tagsMatch = p.tags && p.tags.some(t => t.toLowerCase().includes(q));
-        const promptMatch = p.prompt && p.prompt.toLowerCase().includes(q);
+        const promptMatch = canSearchPrompt && p.prompt && p.prompt.toLowerCase().includes(q);
         return titleMatch || catMatch || descMatch || tagsMatch || promptMatch;
       });
     }
@@ -2387,12 +3038,352 @@ Looking forward to welcoming you! Thank you.`);
     }
   }
 
+  function formatRelativeTime(isoStr) {
+    if (!isoStr) return 'Never';
+    const dt = new Date(isoStr);
+    if (Number.isNaN(dt.getTime())) return '—';
+    const diffMs = Date.now() - dt.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+  }
+
+  function getPlanDisplayName(tier) {
+    if (tier === 'studio_pro') return 'Yashraj Pro';
+    if (tier === 'enterprise') return 'Enterprise';
+    return 'Studio Free';
+  }
+
+  function getFilteredAdminUsers() {
+    let list = Array.isArray(state.admin.users) ? [...state.admin.users] : [];
+
+    if (state.admin.statusFilter && state.admin.statusFilter !== 'all') {
+      list = list.filter(u => (u.plan_status || 'active') === state.admin.statusFilter);
+    }
+    if (state.admin.tierFilter && state.admin.tierFilter !== 'all') {
+      list = list.filter(u => (u.plan_tier || 'free') === state.admin.tierFilter);
+    }
+    if (state.admin.searchQuery && state.admin.searchQuery.trim()) {
+      const q = state.admin.searchQuery.trim().toLowerCase();
+      list = list.filter(u =>
+        String(u.email || '').toLowerCase().includes(q) ||
+        String(u.full_name || '').toLowerCase().includes(q) ||
+        String(u.admin_note || '').toLowerCase().includes(q) ||
+        String(u.last_prompt_title || '').toLowerCase().includes(q) ||
+        String(u.user_id || '').toLowerCase().includes(q)
+      );
+    }
+
+    const sortBy = state.admin.sortBy || 'copies_desc';
+    list.sort((a, b) => {
+      if (sortBy === 'copies_desc') {
+        const aTotal = (Number(a.prompt_copy_count) || 0) + (Number(a.ai_redirect_count) || 0);
+        const bTotal = (Number(b.prompt_copy_count) || 0) + (Number(b.ai_redirect_count) || 0);
+        if (bTotal !== aTotal) return bTotal - aTotal;
+      }
+      if (sortBy === 'email_asc') {
+        return String(a.email || '').localeCompare(String(b.email || ''));
+      }
+      if (sortBy === 'created_desc') {
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+      return new Date(b.last_active_at || b.updated_at || 0).getTime() - new Date(a.last_active_at || a.updated_at || 0).getTime();
+    });
+
+    return list;
+  }
+
+  function renderAdminDashboard() {
+    if (!isAdminUser()) return;
+
+    const users = Array.isArray(state.admin.users) ? state.admin.users : [];
+    const logs = Array.isArray(state.admin.logs) ? state.admin.logs : [];
+
+    const activeCount = users.filter(u => (u.plan_status || 'active') === 'active' || u.plan_status === 'trialing').length;
+    const pendingCount = users.filter(u => u.plan_status === 'pending').length;
+    const pausedCount = users.filter(u => u.plan_status === 'paused').length;
+    const totalCopies = users.reduce((acc, u) => acc + (Number(u.prompt_copy_count) || 0), 0);
+    const totalRedirects = users.reduce((acc, u) => acc + (Number(u.ai_redirect_count) || 0), 0);
+
+    if (dom.adminPendingBadge) {
+      dom.adminPendingBadge.textContent = String(pendingCount);
+      dom.adminPendingBadge.style.display = pendingCount > 0 ? 'inline-flex' : 'none';
+    }
+    if (dom.adminKpiTotalUsers) dom.adminKpiTotalUsers.textContent = String(users.length);
+    if (dom.adminKpiActiveUsers) dom.adminKpiActiveUsers.textContent = String(activeCount);
+    if (dom.adminKpiPendingSub) dom.adminKpiPendingSub.textContent = `${pendingCount} pending approval`;
+    if (dom.adminKpiPausedUsers) dom.adminKpiPausedUsers.textContent = String(pausedCount);
+    if (dom.adminKpiTotalCopies) dom.adminKpiTotalCopies.textContent = totalCopies.toLocaleString('en-IN');
+    if (dom.adminKpiRedirectsSub) dom.adminKpiRedirectsSub.textContent = `${totalRedirects.toLocaleString('en-IN')} AI Auto Take redirects`;
+
+    const filteredUsers = getFilteredAdminUsers();
+
+    if (dom.adminUsersTableBody) {
+      if (state.admin.loading && users.length === 0) {
+        dom.adminUsersTableBody.innerHTML = '<tr><td colspan="7" class="admin-table-empty">Loading studio subscribers from Supabase...</td></tr>';
+      } else if (filteredUsers.length === 0) {
+        dom.adminUsersTableBody.innerHTML = '<tr><td colspan="7" class="admin-table-empty">No subscribers match the current filter.</td></tr>';
+      } else {
+        dom.adminUsersTableBody.innerHTML = filteredUsers.map(u => {
+          const status = u.plan_status || 'active';
+          const tier = u.plan_tier || 'free';
+          const isSelfAdmin = String(u.email || '').trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+          const isSelected = state.admin.selectedUserId === u.user_id;
+          const displayName = u.full_name || (u.email ? u.email.split('@')[0] : 'Studio Member');
+          const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'U';
+          const statusText = status === 'paused' ? 'Paused' : (status === 'pending' ? 'Pending' : 'Active');
+
+          return `
+            <tr class="${isSelected ? 'is-selected' : ''}" data-admin-row="${escapeHtml(u.user_id)}">
+              <td>
+                <div class="admin-user-cell">
+                  ${u.avatar_url
+                    ? `<img class="admin-user-avatar" src="${escapeHtml(u.avatar_url)}" alt="" referrerPolicy="no-referrer" />`
+                    : `<div class="admin-user-initials">${escapeHtml(initials)}</div>`}
+                  <div class="admin-user-meta">
+                    <strong>${escapeHtml(displayName)}${isSelfAdmin ? ' <span class="admin-owner-tag">Admin</span>' : ''}</strong>
+                    <span class="admin-user-email">${escapeHtml(u.email || u.user_id)}</span>
+                    ${u.last_prompt_title ? `<span class="admin-last-prompt">Last: ${escapeHtml(u.last_prompt_title)}</span>` : ''}
+                  </div>
+                </div>
+              </td>
+              <td>
+                <select class="admin-tier-select" data-admin-tier-user="${escapeHtml(u.user_id)}" aria-label="Change plan tier for ${escapeHtml(u.email || u.user_id)}">
+                  <option value="free" ${tier === 'free' ? 'selected' : ''}>Studio Free</option>
+                  <option value="studio_pro" ${tier === 'studio_pro' ? 'selected' : ''}>Yashraj Pro</option>
+                  <option value="enterprise" ${tier === 'enterprise' ? 'selected' : ''}>Enterprise</option>
+                </select>
+              </td>
+              <td>
+                <span class="admin-status-tag status-${escapeHtml(status)}">${escapeHtml(statusText)}</span>
+              </td>
+              <td class="num-col"><strong>${Number(u.prompt_copy_count) || 0}</strong></td>
+              <td class="num-col">${Number(u.ai_redirect_count) || 0}</td>
+              <td>${escapeHtml(formatRelativeTime(u.last_active_at || u.updated_at || u.created_at))}</td>
+              <td class="actions-col">
+                <div class="admin-row-actions">
+                  <button
+                    type="button"
+                    class="admin-btn-approve"
+                    data-admin-approve="${escapeHtml(u.user_id)}"
+                    ${status === 'active' ? 'disabled' : ''}
+                    title="Approve subscription and unlock prompts, copy & AI redirect"
+                  >
+                    <svg style="width: 13px; height: 13px;"><use href="#icon-check"></use></svg>
+                    <span>Approve</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="admin-btn-pause"
+                    data-admin-pause="${escapeHtml(u.user_id)}"
+                    ${(status === 'paused' || isSelfAdmin) ? 'disabled' : ''}
+                    title="${isSelfAdmin ? 'Admin account cannot be paused' : 'Pause subscription and block prompts, copy & AI redirect'}"
+                  >
+                    <svg style="width: 13px; height: 13px;"><use href="#icon-pause"></use></svg>
+                    <span>Pause</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    // Inspector panel
+    const selectedUser = users.find(u => u.user_id === state.admin.selectedUserId) || null;
+    if (dom.adminInspectorEmpty && dom.adminInspectorBody) {
+      if (!selectedUser) {
+        dom.adminInspectorEmpty.style.display = 'block';
+        dom.adminInspectorBody.style.display = 'none';
+        if (dom.adminInspectorSub) dom.adminInspectorSub.textContent = 'Select any row to inspect';
+      } else {
+        dom.adminInspectorEmpty.style.display = 'none';
+        dom.adminInspectorBody.style.display = 'flex';
+        const st = selectedUser.plan_status || 'active';
+        const isSelf = String(selectedUser.email || '').trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        if (dom.adminInspectorSub) dom.adminInspectorSub.textContent = getPlanDisplayName(selectedUser.plan_tier);
+        if (dom.adminInspName) dom.adminInspName.textContent = selectedUser.full_name || 'Studio Subscriber';
+        if (dom.adminInspEmail) dom.adminInspEmail.textContent = selectedUser.email || selectedUser.user_id;
+        if (dom.adminInspStatusTag) {
+          dom.adminInspStatusTag.className = `admin-status-tag status-${st}`;
+          dom.adminInspStatusTag.textContent = st === 'paused' ? 'Paused' : (st === 'pending' ? 'Pending' : 'Active');
+        }
+        if (dom.adminInspCopies) dom.adminInspCopies.textContent = String(Number(selectedUser.prompt_copy_count) || 0);
+        if (dom.adminInspRedirects) dom.adminInspRedirects.textContent = String(Number(selectedUser.ai_redirect_count) || 0);
+        if (dom.adminInspAssets) dom.adminInspAssets.textContent = `${selectedUser.customStyleCount || 0} / ${selectedUser.shopOrderCount || 0}`;
+        if (dom.adminInspNoteInput) dom.adminInspNoteInput.value = selectedUser.admin_note || '';
+        if (dom.btnAdminInspApprove) dom.btnAdminInspApprove.disabled = st === 'active';
+        if (dom.btnAdminInspPause) dom.btnAdminInspPause.disabled = st === 'paused' || isSelf;
+
+        if (dom.adminUserSpecificLogs) {
+          const userLogs = logs.filter(l => l.user_id === selectedUser.user_id).slice(0, 12);
+          dom.adminUserSpecificLogs.innerHTML = userLogs.length === 0
+            ? '<div class="admin-log-empty">No prompt copy events for this user yet.</div>'
+            : userLogs.map(l => `
+              <div class="admin-log-item">
+                <div class="admin-log-main">
+                  <strong>${escapeHtml(l.pin_title || 'Prompt Action')}</strong>
+                  <span>${escapeHtml(l.action_type === 'ai_redirect' ? `AI Redirect${l.ai_target ? ` (${l.ai_target})` : ''}` : 'Copied Prompt')} · ${escapeHtml(l.category || 'Studio')}</span>
+                </div>
+                <span class="admin-log-time">${escapeHtml(formatRelativeTime(l.created_at))}</span>
+              </div>
+            `).join('');
+        }
+      }
+    }
+
+    // Recent studio-wide copy & redirect feed
+    if (dom.adminRecentLogsList) {
+      const topLogs = logs.slice(0, 15);
+      dom.adminRecentLogsList.innerHTML = topLogs.length === 0
+        ? '<div class="admin-log-empty">No prompt copy or AI redirect activity recorded yet.</div>'
+        : topLogs.map(l => `
+          <div class="admin-log-item">
+            <div class="admin-log-main">
+              <strong>${escapeHtml(l.email || l.user_id || 'Member')}</strong>
+              <span>${escapeHtml(l.action_type === 'ai_redirect' ? 'AI Redirect:' : 'Copied:')} ${escapeHtml(l.pin_title || 'Studio Prompt')}</span>
+            </div>
+            <span class="admin-log-time">${escapeHtml(formatRelativeTime(l.created_at))}</span>
+          </div>
+        `).join('');
+    }
+  }
+
+  async function loadAdminDashboard(silent = false) {
+    if (!isAdminUser()) return;
+    if (!silent) {
+      state.admin.loading = true;
+      renderAdminDashboard();
+    }
+
+    if (!state.admin.realtimeSubscribed) {
+      state.admin.realtimeSubscribed = true;
+      cloudSync.subscribeAdminRealtime(() => {
+        if (isAdminUser()) loadAdminDashboard(true);
+      });
+    }
+
+    const res = await cloudSync.fetchAdminDashboardData();
+    state.admin.loading = false;
+
+    if (!res.ok) {
+      state.admin.needsSqlMigration = Boolean(res.needsSqlMigration);
+      if (!silent) showToast(res.error || 'Could not load admin dashboard');
+      renderAdminDashboard();
+      return;
+    }
+
+    state.admin.users = res.users || [];
+    state.admin.logs = res.logs || [];
+    state.admin.needsSqlMigration = Boolean(res.needsSqlMigration);
+    state.admin.onlySelfVisible = Boolean(res.onlySelfVisible);
+
+    if (!state.admin.selectedUserId || !state.admin.users.some(u => u.user_id === state.admin.selectedUserId)) {
+      state.admin.selectedUserId = state.admin.users[0]?.user_id || null;
+    }
+
+    renderAdminDashboard();
+  }
+
+  async function handleAdminStatusAction(userId, nextStatus) {
+    if (!isAdminUser() || !userId) return;
+    const res = await cloudSync.adminUpdateSubscription(userId, { plan_status: nextStatus });
+    if (!res.ok) {
+      showToast(`Admin update failed: ${res.error || 'Check Supabase RLS policies'}`);
+      return;
+    }
+    const idx = state.admin.users.findIndex(u => u.user_id === userId);
+    if (idx >= 0 && res.row) {
+      state.admin.users[idx] = { ...state.admin.users[idx], ...res.row };
+    }
+    renderAdminDashboard();
+    showToast(nextStatus === 'active'
+      ? 'Subscription Approved — prompts & AI redirect unlocked!'
+      : 'Subscription Paused — prompts, copy & AI redirect locked!');
+  }
+
+  async function handleAdminTierChange(userId, nextTier) {
+    if (!isAdminUser() || !userId || !nextTier) return;
+    const res = await cloudSync.adminUpdateSubscription(userId, { plan_tier: nextTier });
+    if (!res.ok) {
+      showToast(`Tier update failed: ${res.error || 'Error'}`);
+      renderAdminDashboard();
+      return;
+    }
+    const idx = state.admin.users.findIndex(u => u.user_id === userId);
+    if (idx >= 0 && res.row) {
+      state.admin.users[idx] = { ...state.admin.users[idx], ...res.row };
+    }
+    renderAdminDashboard();
+    showToast(`Plan updated to ${getPlanDisplayName(nextTier)}`);
+  }
+
+  async function handleAdminSaveNote() {
+    if (!isAdminUser() || !state.admin.selectedUserId || !dom.adminInspNoteInput) return;
+    const userId = state.admin.selectedUserId;
+    const note = dom.adminInspNoteInput.value || '';
+    const res = await cloudSync.adminUpdateSubscription(userId, { admin_note: note });
+    if (!res.ok) {
+      showToast(`Failed to save note: ${res.error || 'Error'}`);
+      return;
+    }
+    const idx = state.admin.users.findIndex(u => u.user_id === userId);
+    if (idx >= 0 && res.row) {
+      state.admin.users[idx] = { ...state.admin.users[idx], ...res.row };
+    }
+    renderAdminDashboard();
+    showToast('Admin payment/approval note saved');
+  }
+
+  function exportAdminUsersCsv() {
+    const rows = getFilteredAdminUsers();
+    if (rows.length === 0) {
+      showToast('No subscriber rows to export');
+      return;
+    }
+    const header = ['Email', 'Full Name', 'Plan Tier', 'Status', 'Prompts Copied', 'AI Redirects', 'Custom Styles', 'Shop Orders', 'Last Prompt', 'Last Active', 'Admin Note'];
+    const csvCell = (val) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+    const lines = [
+      header.map(csvCell).join(','),
+      ...rows.map(u => [
+        u.email || u.user_id,
+        u.full_name || '',
+        u.plan_tier || 'free',
+        u.plan_status || 'active',
+        Number(u.prompt_copy_count) || 0,
+        Number(u.ai_redirect_count) || 0,
+        Number(u.customStyleCount) || 0,
+        Number(u.shopOrderCount) || 0,
+        u.last_prompt_title || '',
+        u.last_active_at || u.updated_at || '',
+        u.admin_note || ''
+      ].map(csvCell).join(','))
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `yashraj-subscribers-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Subscriber stats exported to CSV');
+  }
+
   function renderView(viewName) {
     if (viewName === 'home') renderHomeFeed();
     else if (viewName === 'boards') renderBoardsView();
     else if (viewName === 'framing') renderFramingStudio();
     else if (viewName === 'saved') renderSavedView();
     else if (viewName === 'history') renderHistoryView();
+    else if (viewName === 'admin') loadAdminDashboard();
     updateCounters();
   }
 
@@ -2437,15 +3428,6 @@ Looking forward to welcoming you! Thank you.`);
     dom.modalPinTitle.textContent = pin.title;
     dom.modalCategoryBadge.textContent = `${pin.category} · Studio Preset`;
     dom.modalPinDesc.textContent = pin.description;
-    dom.modalPromptText.textContent = pin.prompt;
-
-    const words = pin.prompt ? pin.prompt.trim().split(/\s+/).length : 0;
-    const chars = pin.prompt ? pin.prompt.length : 0;
-    dom.modalPromptCounts.textContent = `${words} words · ${chars} characters`;
-
-    // Show/Hide prompt vs client showroom card based on mode
-    if (dom.modalPromptCard) dom.modalPromptCard.style.display = state.clientMode ? 'none' : 'block';
-    if (dom.modalClientShowroomCard) dom.modalClientShowroomCard.style.display = state.clientMode ? 'block' : 'none';
 
     // Tags
     dom.modalTagsContainer.innerHTML = '';
@@ -2464,8 +3446,14 @@ Looking forward to welcoming you! Thank you.`);
       });
     }
 
-    // Favorite state
+    // Apply subscription lock & showroom visibility (clears prompt from DOM when locked)
+    applyModalPromptAccessUI(pin);
+
+    // Favorite state & custom delete action
     updateModalFavState();
+    if (dom.btnModalDeleteCustom) {
+      dom.btnModalDeleteCustom.style.display = (pin.isCustom && isAdminUser()) ? 'inline-flex' : 'none';
+    }
 
     // Reset Copy Label
     dom.btnModalCopyLabel.textContent = 'Copy Prompt';
@@ -2474,6 +3462,71 @@ Looking forward to welcoming you! Thank you.`);
     // Show modal
     dom.pinDetailModal.classList.add('active');
     document.body.style.overflow = 'hidden';
+  }
+
+  function applyModalPromptAccessUI(pin) {
+    if (!pin) return;
+    const access = getPromptAccessState();
+
+    if (!access.allowed) {
+      if (dom.modalPromptText) dom.modalPromptText.textContent = '';
+      if (dom.modalPromptCounts) dom.modalPromptCounts.textContent = 'Locked';
+      if (dom.modalPromptCard) dom.modalPromptCard.style.display = 'none';
+      if (dom.pinPromptCustomizer) dom.pinPromptCustomizer.style.display = 'none';
+      if (dom.modalClientShowroomCard) dom.modalClientShowroomCard.style.display = 'none';
+      if (dom.btnModalAutoTake) dom.btnModalAutoTake.style.display = 'none';
+      if (dom.btnModalCopyPrompt) dom.btnModalCopyPrompt.style.display = 'none';
+      if (dom.btnMobModalAutoTake) dom.btnMobModalAutoTake.style.display = 'none';
+      if (dom.btnMobModalCopyPrompt) dom.btnMobModalCopyPrompt.style.display = 'none';
+      if (dom.modalSubscriptionLockedCard) {
+        dom.modalSubscriptionLockedCard.style.display = 'flex';
+        if (dom.lblModalLockTitle) {
+          if (access.status === 'signed_out') {
+            dom.lblModalLockTitle.textContent = 'Sign In & Admin Approval Required';
+          } else if (access.status === 'pending') {
+            dom.lblModalLockTitle.textContent = 'Awaiting Manual Admin Approval';
+          } else {
+            dom.lblModalLockTitle.textContent = 'Subscription Paused — Prompt Access Locked';
+          }
+        }
+        if (dom.lblModalLockDesc) {
+          if (access.status === 'signed_out') {
+            dom.lblModalLockDesc.textContent = `You must sign in and be manually approved by Studio Admin (${ADMIN_EMAIL}) before viewing prompts, copying, or using AI Auto Take.`;
+          } else if (access.status === 'pending') {
+            dom.lblModalLockDesc.textContent = `You are signed in and queued for manual verification by Studio Admin (${ADMIN_EMAIL}). Prompt viewing, copying, and AI Auto Take unlock immediately once approved.`;
+          } else {
+            dom.lblModalLockDesc.textContent = `Viewing, copying AI prompts, and AI Auto Take redirects are disabled while your access is paused. Please contact Studio Admin (${ADMIN_EMAIL}) to reactivate.`;
+          }
+        }
+        if (dom.lblModalLockAccountBtn) {
+          if (access.status === 'signed_out') {
+            dom.lblModalLockAccountBtn.textContent = 'Sign In to Request Access';
+          } else if (access.status === 'pending') {
+            dom.lblModalLockAccountBtn.textContent = 'View Approval Status';
+          } else {
+            dom.lblModalLockAccountBtn.textContent = 'Open Account & Status';
+          }
+        }
+      }
+      return;
+    }
+
+    if (dom.modalSubscriptionLockedCard) dom.modalSubscriptionLockedCard.style.display = 'none';
+    if (dom.btnModalAutoTake) dom.btnModalAutoTake.style.display = '';
+    if (dom.btnModalCopyPrompt) dom.btnModalCopyPrompt.style.display = '';
+    if (dom.btnMobModalAutoTake) dom.btnMobModalAutoTake.style.display = '';
+    if (dom.btnMobModalCopyPrompt) dom.btnMobModalCopyPrompt.style.display = '';
+    if (dom.pinPromptCustomizer) dom.pinPromptCustomizer.style.display = state.clientMode ? 'none' : '';
+    if (dom.modalPromptCard) dom.modalPromptCard.style.display = state.clientMode ? 'none' : 'block';
+    if (dom.modalClientShowroomCard) dom.modalClientShowroomCard.style.display = state.clientMode ? 'block' : 'none';
+
+    const displayPrompt = getCustomizedPrompt(pin);
+    if (dom.modalPromptText) dom.modalPromptText.textContent = displayPrompt;
+    if (dom.modalPromptCounts) {
+      const words = displayPrompt ? displayPrompt.trim().split(/\s+/).filter(Boolean).length : 0;
+      const chars = displayPrompt ? displayPrompt.length : 0;
+      dom.modalPromptCounts.textContent = `${words} words · ${chars} characters`;
+    }
   }
 
   function closePinModal() {
@@ -2858,15 +3911,229 @@ Looking forward to welcoming you! Thank you.`);
       dom.btnFramingAiTake.addEventListener('click', handleFramingAiAutoTake);
     }
     if (dom.btnOpenJobSlipModal) {
-      dom.btnOpenJobSlipModal.addEventListener('click', openJobSlipModal);
+      dom.btnOpenJobSlipModal.addEventListener('click', () => openJobSlipModal());
     }
 
-    // Header Shop Actions
+    // Header Shop Actions & Quick Mobile Add Style Triggers
     if (dom.btnHeaderAddStyle) {
       dom.btnHeaderAddStyle.addEventListener('click', openAddStyleModal);
     }
+    if (dom.btnFeedAddStyle) {
+      dom.btnFeedAddStyle.addEventListener('click', openAddStyleModal);
+    }
+    if (dom.btnSavedAddStyle) {
+      dom.btnSavedAddStyle.addEventListener('click', openAddStyleModal);
+    }
     if (dom.btnHeaderShopOrders) {
       dom.btnHeaderShopOrders.addEventListener('click', openShopOrdersModal);
+    }
+
+    // Clerk Auth, Account & Subscription Modal Handlers
+    if (dom.btnHeaderAccount) {
+      dom.btnHeaderAccount.addEventListener('click', openAccountPlanModal);
+    }
+    if (dom.btnProfileAccountAction) {
+      dom.btnProfileAccountAction.addEventListener('click', openAccountPlanModal);
+    }
+    if (dom.accountPlanCloseBtn) {
+      dom.accountPlanCloseBtn.addEventListener('click', closeAccountPlanModal);
+    }
+    if (dom.accountPlanModal) {
+      dom.accountPlanModal.addEventListener('click', (e) => {
+        if (e.target === dom.accountPlanModal) closeAccountPlanModal();
+      });
+    }
+    if (dom.btnAccountSignIn) {
+      dom.btnAccountSignIn.addEventListener('click', async () => {
+        closeAccountPlanModal();
+        await openClerkAuthModal('signIn');
+      });
+    }
+    if (dom.btnAccountSignUp) {
+      dom.btnAccountSignUp.addEventListener('click', async () => {
+        closeAccountPlanModal();
+        await openClerkAuthModal('signUp');
+      });
+    }
+    if (dom.clerkAuthHostCloseBtn) {
+      dom.clerkAuthHostCloseBtn.addEventListener('click', closeClerkAuthModal);
+    }
+    if (dom.clerkAuthHostModal) {
+      dom.clerkAuthHostModal.addEventListener('click', (e) => {
+        if (e.target === dom.clerkAuthHostModal) closeClerkAuthModal();
+      });
+    }
+    if (dom.btnManageClerkProfile) {
+      dom.btnManageClerkProfile.addEventListener('click', () => {
+        cloudSync.openUserProfile();
+      });
+    }
+    if (dom.btnAccountSignOut) {
+      dom.btnAccountSignOut.addEventListener('click', async () => {
+        await cloudSync.signOut();
+        closeAccountPlanModal();
+        showToast('Signed out from studio cloud');
+      });
+    }
+    if (dom.btnSyncLocalToCloud) {
+      dom.btnSyncLocalToCloud.addEventListener('click', async () => {
+        if (!cloudSync.user || !cloudSync.supabase) {
+          showToast('Sign in with Clerk and configure Supabase first');
+          return;
+        }
+        await cloudSync.upsertStylesBatch(state.customStyles);
+        await cloudSync.upsertOrdersBatch(state.shopOrders);
+        syncPreferencesToCloud();
+        showToast('All local styles & orders pushed to Supabase!');
+      });
+    }
+
+    // Account Subscription Tier Request Buttons
+    if (dom.subscriptionTiersGrid) {
+      dom.subscriptionTiersGrid.addEventListener('click', async (e) => {
+        const reqBtn = e.target.closest('[data-request-tier]');
+        if (!reqBtn) return;
+        const tier = reqBtn.getAttribute('data-request-tier');
+        if (!cloudSync.user) {
+          closeAccountPlanModal();
+          await openClerkAuthModal('signIn');
+          return;
+        }
+        reqBtn.disabled = true;
+        const res = await cloudSync.requestSubscriptionUpgrade(tier);
+        updateAccountAndSubscriptionUI();
+        if (res.ok) {
+          showToast(`Subscription request sent to ${ADMIN_EMAIL} for approval!`);
+        } else {
+          showToast(`Unable to send request: ${res.error || 'Check Supabase connection'}`);
+        }
+      });
+    }
+
+    // Locked Pin Modal -> Open Clerk Sign In (if signed out) or Account Status Modal (if signed in)
+    if (dom.btnModalLockAccount) {
+      dom.btnModalLockAccount.addEventListener('click', () => {
+        closePinModal();
+        if (typeof cloudSync === 'undefined' || !cloudSync.user) {
+          openClerkAuthModal('signIn');
+        } else {
+          openAccountPlanModal();
+        }
+      });
+    }
+
+    // Admin Console Entrypoints & Workspace Event Listeners (yashrajart1999@gmail.com only)
+    if (dom.btnHeaderAdmin) {
+      dom.btnHeaderAdmin.addEventListener('click', () => {
+        if (isAdminUser()) switchView('admin');
+      });
+    }
+    if (dom.mobSheetAdminRow) {
+      dom.mobSheetAdminRow.addEventListener('click', () => {
+        closeMobileToolsSheet();
+        if (isAdminUser()) switchView('admin');
+      });
+    }
+    if (dom.btnAccountOpenAdmin) {
+      dom.btnAccountOpenAdmin.addEventListener('click', () => {
+        closeAccountPlanModal();
+        if (isAdminUser()) switchView('admin');
+      });
+    }
+    if (dom.btnAdminAddStyle) {
+      dom.btnAdminAddStyle.addEventListener('click', () => {
+        if (isAdminUser()) openAddStyleModal();
+      });
+    }
+    if (dom.btnAdminRefresh) {
+      dom.btnAdminRefresh.addEventListener('click', () => loadAdminDashboard(false));
+    }
+    if (dom.btnAdminExportCsv) {
+      dom.btnAdminExportCsv.addEventListener('click', exportAdminUsersCsv);
+    }
+    if (dom.btnAdminBackHome) {
+      dom.btnAdminBackHome.addEventListener('click', () => switchView('home'));
+    }
+    window.addEventListener('focus', () => {
+      if (typeof cloudSync !== 'undefined' && cloudSync.user) {
+        cloudSync.refreshSubscriptionFromServer();
+      }
+    });
+    if (dom.adminSearchInput) {
+      dom.adminSearchInput.addEventListener('input', (e) => {
+        state.admin.searchQuery = e.target.value || '';
+        renderAdminDashboard();
+      });
+    }
+    if (dom.adminStatusTabs) {
+      dom.adminStatusTabs.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-admin-status]');
+        if (!btn) return;
+        state.admin.statusFilter = btn.getAttribute('data-admin-status') || 'all';
+        dom.adminStatusTabs.querySelectorAll('.admin-seg-btn').forEach(b => {
+          b.classList.toggle('active', b === btn);
+        });
+        renderAdminDashboard();
+      });
+    }
+    if (dom.adminTierFilter) {
+      dom.adminTierFilter.addEventListener('change', (e) => {
+        state.admin.tierFilter = e.target.value || 'all';
+        renderAdminDashboard();
+      });
+    }
+    if (dom.adminSortSelect) {
+      dom.adminSortSelect.addEventListener('change', (e) => {
+        state.admin.sortBy = e.target.value || 'copies_desc';
+        renderAdminDashboard();
+      });
+    }
+    if (dom.adminUsersTableBody) {
+      dom.adminUsersTableBody.addEventListener('click', (e) => {
+        const approveBtn = e.target.closest('[data-admin-approve]');
+        if (approveBtn) {
+          e.stopPropagation();
+          handleAdminStatusAction(approveBtn.getAttribute('data-admin-approve'), 'active');
+          return;
+        }
+        const pauseBtn = e.target.closest('[data-admin-pause]');
+        if (pauseBtn) {
+          e.stopPropagation();
+          handleAdminStatusAction(pauseBtn.getAttribute('data-admin-pause'), 'paused');
+          return;
+        }
+        if (e.target.closest('.admin-tier-select')) return;
+        const row = e.target.closest('[data-admin-row]');
+        if (row) {
+          state.admin.selectedUserId = row.getAttribute('data-admin-row');
+          renderAdminDashboard();
+        }
+      });
+      dom.adminUsersTableBody.addEventListener('change', (e) => {
+        const tierSelect = e.target.closest('[data-admin-tier-user]');
+        if (!tierSelect) return;
+        handleAdminTierChange(tierSelect.getAttribute('data-admin-tier-user'), tierSelect.value);
+      });
+    }
+    if (dom.btnAdminSaveNote) {
+      dom.btnAdminSaveNote.addEventListener('click', handleAdminSaveNote);
+    }
+    if (dom.btnAdminInspApprove) {
+      dom.btnAdminInspApprove.addEventListener('click', () => {
+        if (state.admin.selectedUserId) handleAdminStatusAction(state.admin.selectedUserId, 'active');
+      });
+    }
+    if (dom.btnAdminInspPause) {
+      dom.btnAdminInspPause.addEventListener('click', () => {
+        if (state.admin.selectedUserId) handleAdminStatusAction(state.admin.selectedUserId, 'paused');
+      });
+    }
+    if (dom.btnModalDeleteCustom) {
+      dom.btnModalDeleteCustom.addEventListener('click', () => {
+        if (state.activeModalPin && state.activeModalPin.isCustom) {
+          deleteCustomStyle(state.activeModalPin.id);
+        }
+      });
     }
 
     // Preset Picker Modal Handlers
@@ -2903,16 +4170,18 @@ Looking forward to welcoming you! Thank you.`);
       dom.btnBrowseNewStyleImage.addEventListener('click', () => dom.fileNewStyleImage.click());
     }
     if (dom.fileNewStyleImage) {
-      dom.fileNewStyleImage.addEventListener('change', (e) => {
+      dom.fileNewStyleImage.addEventListener('change', async (e) => {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          if (dom.newStyleImagePreview) dom.newStyleImagePreview.src = ev.target.result;
+        try {
+          if (dom.lblNewStyleFileName) dom.lblNewStyleFileName.textContent = 'Optimizing photo for cloud sync...';
+          const optimizedDataUrl = await compressImageFileForCloud(file);
+          if (dom.newStyleImagePreview) dom.newStyleImagePreview.src = optimizedDataUrl;
           if (dom.newStyleImagePreviewContainer) dom.newStyleImagePreviewContainer.style.display = 'flex';
-          if (dom.lblNewStyleFileName) dom.lblNewStyleFileName.textContent = `${file.name} (Uploaded)`;
-        };
-        reader.readAsDataURL(file);
+          if (dom.lblNewStyleFileName) dom.lblNewStyleFileName.textContent = `${file.name} (Cloud Ready)`;
+        } catch (err) {
+          showToast('Unable to process selected image');
+        }
       });
     }
     if (dom.txtNewStyleImageUrl) {
@@ -3001,6 +4270,7 @@ Looking forward to welcoming you! Thank you.`);
       dom.pinPromptCustomizer.addEventListener('click', (e) => {
         const chip = e.target.closest('.cust-chip');
         if (!chip) return;
+        if (!enforceLockedPromptAction('Prompt customizer')) return;
         const row = chip.closest('.customizer-row');
         if (!row) return;
         row.querySelectorAll('.cust-chip').forEach(c => c.classList.remove('active'));
@@ -3169,6 +4439,12 @@ Looking forward to welcoming you! Thank you.`);
         if (e.target === dom.mobileToolsSheet) closeMobileToolsSheet();
       });
     }
+    if (dom.mobSheetAccountRow) {
+      dom.mobSheetAccountRow.addEventListener('click', () => {
+        closeMobileToolsSheet();
+        openAccountPlanModal();
+      });
+    }
     if (dom.mobSheetAiTarget) {
       dom.mobSheetAiTarget.addEventListener('click', () => {
         closeMobileToolsSheet();
@@ -3190,7 +4466,7 @@ Looking forward to welcoming you! Thank you.`);
     if (dom.mobSheetAddStyle) {
       dom.mobSheetAddStyle.addEventListener('click', () => {
         closeMobileToolsSheet();
-        if (dom.btnHeaderAddStyle) dom.btnHeaderAddStyle.click();
+        openAddStyleModal();
       });
     }
     if (dom.mobSheetHistory) {
@@ -3210,6 +4486,7 @@ Looking forward to welcoming you! Thank you.`);
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if (dom.mobileToolsSheet && dom.mobileToolsSheet.classList.contains('active')) closeMobileToolsSheet();
+        else if (dom.accountPlanModal && dom.accountPlanModal.classList.contains('active')) closeAccountPlanModal();
         else if (dom.aiAutoTakeModal && dom.aiAutoTakeModal.classList.contains('active')) closeAiLauncherModal();
         else if (dom.presetPickerModal && dom.presetPickerModal.classList.contains('active')) closePresetPicker();
         else if (dom.addStyleModal && dom.addStyleModal.classList.contains('active')) closeAddStyleModal();
@@ -3238,7 +4515,7 @@ Looking forward to welcoming you! Thank you.`);
         if (dom.clientReceiptPortal) dom.clientReceiptPortal.style.display = 'none';
       }
       const cleanHash = hash.replace('#', '');
-      if (cleanHash && ['home', 'explore', 'boards', 'framing', 'saved', 'history'].includes(cleanHash)) {
+      if (cleanHash && ['home', 'explore', 'boards', 'framing', 'saved', 'history', 'admin'].includes(cleanHash)) {
         if (state.currentView !== cleanHash) switchView(cleanHash);
       }
     });
@@ -3260,15 +4537,20 @@ Looking forward to welcoming you! Thank you.`);
   function init() {
     loadStorage();
     updateHeaderAiIndicator();
+    updateAccountAndSubscriptionUI();
     renderCategoryChips();
     setupEventListeners();
+    cloudSync.init();
+    if (cloudSync.hasPendingCallbackHash()) {
+      openClerkAuthModal('signIn');
+    }
 
     if (checkAndOpenReceiptFromUrl()) {
       return;
     }
 
     const initialHash = window.location.hash.replace('#', '');
-    if (initialHash && ['home', 'explore', 'boards', 'framing', 'saved', 'history'].includes(initialHash)) {
+    if (initialHash && ['home', 'explore', 'boards', 'framing', 'saved', 'history', 'admin'].includes(initialHash)) {
       switchView(initialHash);
     } else {
       switchView('home');
