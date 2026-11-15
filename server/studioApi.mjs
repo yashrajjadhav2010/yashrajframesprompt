@@ -268,6 +268,65 @@ function mapSupabaseStatusBack(supaStatus, metaStatus, isAdmin = false) {
   return 'pending';
 }
 
+const VALIDITY_PRESET_DAYS = {
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+  '365d': 365
+};
+
+function resolveValidityUpdate(body, prevMeta = {}, isTargetAdmin = false) {
+  if (isTargetAdmin) {
+    return { provided: true, expiresAt: null, validityLabel: 'Lifetime (Admin)', validityPreset: 'lifetime' };
+  }
+
+  const preset = typeof body?.validity_preset === 'string' ? body.validity_preset.trim() : '';
+  if (preset === 'lifetime') {
+    return { provided: true, expiresAt: null, validityLabel: 'Lifetime', validityPreset: 'lifetime' };
+  }
+  if (VALIDITY_PRESET_DAYS[preset]) {
+    const days = VALIDITY_PRESET_DAYS[preset];
+    const labelMap = { '7d': '7-Day Trial', '30d': '30 Days', '90d': '90 Days', '365d': '1 Year' };
+    return {
+      provided: true,
+      expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString(),
+      validityLabel: labelMap[preset] || `${days} Days`,
+      validityPreset: preset
+    };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, 'access_expires_at')) {
+    const rawExp = body.access_expires_at;
+    if (rawExp === null || rawExp === '') {
+      return { provided: true, expiresAt: null, validityLabel: 'Lifetime', validityPreset: 'lifetime' };
+    }
+    if (typeof rawExp === 'string') {
+      const normalized = /^\d{4}-\d{2}-\d{2}$/.test(rawExp.trim())
+        ? `${rawExp.trim()}T23:59:59.999Z`
+        : rawExp.trim();
+      const ms = Date.parse(normalized);
+      if (!Number.isNaN(ms)) {
+        return {
+          provided: true,
+          expiresAt: new Date(ms).toISOString(),
+          validityLabel: 'Custom Date',
+          validityPreset: 'custom'
+        };
+      }
+    }
+  }
+
+  // If approving an expired user without specifying a new validity, clear stale expiry to Lifetime
+  if (body?.plan_status === 'active' && typeof prevMeta.accessExpiresAt === 'string') {
+    const prevMs = Date.parse(prevMeta.accessExpiresAt);
+    if (!Number.isNaN(prevMs) && prevMs <= Date.now()) {
+      return { provided: true, expiresAt: null, validityLabel: 'Lifetime', validityPreset: 'lifetime' };
+    }
+  }
+
+  return { provided: false };
+}
+
 function buildMergedSubscriber(clerkUser, supaRow = null, styleCount = 0, orderCount = 0) {
   const meta = (clerkUser?.public_metadata && typeof clerkUser.public_metadata === 'object')
     ? clerkUser.public_metadata
@@ -279,11 +338,23 @@ function buildMergedSubscriber(clerkUser, supaRow = null, styleCount = 0, orderC
     : ((typeof supaRow?.plan_tier === 'string' && PLAN_LIMITS[supaRow.plan_tier]) ? supaRow.plan_tier : 'free');
   const limits = PLAN_LIMITS[tier] || PLAN_LIMITS.free;
   const isTargetAdmin = isClerkRecordAdmin(clerkUser);
-  const status = mapSupabaseStatusBack(
+  const baseStatus = mapSupabaseStatusBack(
     typeof supaRow?.plan_status === 'string' ? supaRow.plan_status : undefined,
     meta.planStatus,
     isTargetAdmin
   );
+
+  const hasExplicitNullExpiry = meta.accessExpiresAt === null;
+  const rawExpiresAt = isTargetAdmin || hasExplicitNullExpiry
+    ? null
+    : ((typeof meta.accessExpiresAt === 'string' && meta.accessExpiresAt)
+      ? meta.accessExpiresAt
+      : (typeof supaRow?.current_period_end === 'string' && supaRow.current_period_end ? supaRow.current_period_end : null));
+
+  const expiresMs = rawExpiresAt ? Date.parse(rawExpiresAt) : NaN;
+  const isPastExpiry = !isTargetAdmin && Boolean(rawExpiresAt) && Number.isFinite(expiresMs) && expiresMs <= Date.now();
+  const isExpired = isPastExpiry && baseStatus === 'active';
+  const effectiveStatus = isExpired ? 'pending' : baseStatus;
 
   const copyCount = Math.max(
     Number(meta.promptCopyCount) || 0,
@@ -308,7 +379,12 @@ function buildMergedSubscriber(clerkUser, supaRow = null, styleCount = 0, orderC
     full_name: fullName,
     avatar_url: clerkUser.image_url || '',
     plan_tier: tier,
-    plan_status: status,
+    plan_status: effectiveStatus,
+    is_expired: isExpired,
+    access_expires_at: rawExpiresAt,
+    current_period_end: rawExpiresAt,
+    validity_preset: isTargetAdmin ? 'lifetime' : (typeof meta.validityPreset === 'string' ? meta.validityPreset : (rawExpiresAt ? 'custom' : 'lifetime')),
+    validity_label: isTargetAdmin ? 'Lifetime (Admin)' : (typeof meta.validityLabel === 'string' && meta.validityLabel ? meta.validityLabel : (rawExpiresAt ? 'Timed Access' : 'Lifetime')),
     style_limit: Number(supaRow?.style_limit) || limits.styleLimit,
     order_limit: Number(supaRow?.order_limit) || limits.orderLimit,
     prompt_copy_count: copyCount,
@@ -334,6 +410,7 @@ async function syncUserSubscriptionRowToSupabase(userId, payload) {
   if (payload.plan_status !== undefined) row.plan_status = payload.plan_status;
   if (payload.style_limit !== undefined) row.style_limit = payload.style_limit;
   if (payload.order_limit !== undefined) row.order_limit = payload.order_limit;
+  if (payload.current_period_end !== undefined) row.current_period_end = payload.current_period_end;
 
   const firstAttempt = await supaRest('user_subscriptions?on_conflict=user_id', {
     method: 'POST',
@@ -421,6 +498,34 @@ async function authenticateRequest(req) {
   };
 }
 
+async function resolveAdminUserIds() {
+  const res = await clerkRequest(`/users?email_address[]=${encodeURIComponent(ADMIN_EMAIL)}&limit=10`);
+  if (res.ok && Array.isArray(res.data)) {
+    return new Set(res.data.map(u => u.id).filter(Boolean));
+  }
+  return null;
+}
+
+function mapDbStyleToClient(row, includePrompt) {
+  if (!row) return null;
+  const img = row.reference_image || row.thumbnail || 'assets/prompts/01.jpeg';
+  return {
+    id: Number(row.id),
+    title: row.title || 'Untitled Style',
+    category: row.category || 'Other',
+    prompt: includePrompt ? (row.prompt || '') : '',
+    promptLocked: !includePrompt,
+    referenceImage: img,
+    thumbnail: row.thumbnail || img,
+    image: img,
+    aspectRatio: row.aspect_ratio || '2:3',
+    description: row.description || `${row.category || 'Studio'} photography with studio lighting`,
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    isCustom: true,
+    createdAt: row.created_at || new Date().toISOString()
+  };
+}
+
 export async function handleStudioApiRequest(req, res) {
   const rawUrl = req.url || '/';
   const pathname = rawUrl.split('?')[0];
@@ -437,6 +542,49 @@ export async function handleStudioApiRequest(req, res) {
       supabaseReady: Boolean(cfg.supabaseUrl && cfg.supabaseSecretKey),
       platform: process.env.VERCEL ? 'vercel' : 'node'
     });
+    return true;
+  }
+
+  // Public shared Studio Styles catalog:
+  // Visual cards are visible to ALL users; prompts are included ONLY for Admin or approved active subscribers.
+  if (pathname === '/api/styles' && method === 'GET') {
+    let canAccessPrompts = false;
+    const authHeader = String(req.headers.authorization || '');
+    if (authHeader.startsWith('Bearer ')) {
+      const maybeAuth = await authenticateRequest(req);
+      if (maybeAuth.ok) {
+        if (maybeAuth.isAdmin) {
+          canAccessPrompts = true;
+        } else {
+          const subRes = await supaRest(
+            `user_subscriptions?user_id=eq.${encodeURIComponent(maybeAuth.user.id)}&select=plan_status,current_period_end`
+          );
+          const supaRow = Array.isArray(subRes.data) && subRes.data[0] ? subRes.data[0] : null;
+          const merged = buildMergedSubscriber(maybeAuth.user, supaRow);
+          canAccessPrompts = merged.plan_status === 'active';
+        }
+      }
+    }
+
+    const [stylesRes, adminIds] = await Promise.all([
+      supaRest('studio_styles?select=*&order=created_at.desc'),
+      resolveAdminUserIds()
+    ]);
+
+    if (!stylesRes.ok || !Array.isArray(stylesRes.data)) {
+      sendJson(res, 200, { ok: true, styles: [], promptUnlocked: canAccessPrompts });
+      return true;
+    }
+
+    const rows = (adminIds && adminIds.size > 0)
+      ? stylesRes.data.filter(r => adminIds.has(r.user_id))
+      : stylesRes.data;
+
+    const styles = rows
+      .map(r => mapDbStyleToClient(r, canAccessPrompts))
+      .filter(Boolean);
+
+    sendJson(res, 200, { ok: true, styles, promptUnlocked: canAccessPrompts });
     return true;
   }
 
@@ -488,7 +636,31 @@ export async function handleStudioApiRequest(req, res) {
       }
     }
 
-    const subscription = buildMergedSubscriber(userRecord, supaRow);
+    let subscription = buildMergedSubscriber(userRecord, supaRow);
+
+    // If an approved user's validity period has expired, persist the automatic lock back to Clerk + Supabase
+    if (!auth.isAdmin && subscription.is_expired) {
+      const expiredMeta = {
+        ...((userRecord.public_metadata && typeof userRecord.public_metadata === 'object') ? userRecord.public_metadata : {}),
+        planStatus: 'pending'
+      };
+      const [clerkLockRes] = await Promise.all([
+        clerkRequest(`/users/${encodeURIComponent(auth.user.id)}/metadata`, {
+          method: 'PATCH',
+          body: JSON.stringify({ public_metadata: expiredMeta })
+        }),
+        syncUserSubscriptionRowToSupabase(auth.user.id, {
+          email,
+          plan_status: 'pending'
+        })
+      ]);
+      if (clerkLockRes.ok && clerkLockRes.data?.id) {
+        userRecord = clerkLockRes.data;
+      }
+      subscription = buildMergedSubscriber(userRecord, supaRow);
+      subscription.is_expired = true;
+    }
+
     sendJson(res, 200, {
       ok: true,
       isAdmin: auth.isAdmin,
@@ -550,8 +722,11 @@ export async function handleStudioApiRequest(req, res) {
       sendJson(res, 403, {
         ok: false,
         locked: true,
+        expired: Boolean(currentMerged.is_expired),
         status: currentMerged.plan_status,
-        error: 'Prompt access is locked until approved by Studio Admin.'
+        error: currentMerged.is_expired
+          ? 'Your access validity period has expired. Please contact Studio Admin to renew.'
+          : 'Prompt access is locked until approved by Studio Admin.'
       });
       return true;
     }
@@ -610,7 +785,7 @@ export async function handleStudioApiRequest(req, res) {
   // 4. Admin Dashboard (Strictly yashrajart1999@gmail.com)
   if (pathname === '/api/admin/dashboard' && method === 'GET') {
     if (!auth.isAdmin) {
-      sendJson(res, 403, { ok: false, error: `Admin access restricted to ${ADMIN_EMAIL}` });
+      sendJson(res, 403, { ok: false, error: 'Admin access restricted to Studio Admin' });
       return true;
     }
 
@@ -687,7 +862,7 @@ export async function handleStudioApiRequest(req, res) {
   // 5. Admin Approve / Pause / Change Tier / Save Note (Strictly yashrajart1999@gmail.com)
   if (pathname === '/api/admin/subscription' && method === 'POST') {
     if (!auth.isAdmin) {
-      sendJson(res, 403, { ok: false, error: `Admin access restricted to ${ADMIN_EMAIL}` });
+      sendJson(res, 403, { ok: false, error: 'Admin access restricted to Studio Admin' });
       return true;
     }
 
@@ -726,6 +901,8 @@ export async function handleStudioApiRequest(req, res) {
       nextStatus = body.plan_status;
     }
 
+    const validityUpdate = resolveValidityUpdate(body, prevMeta, isTargetAdmin);
+
     const nowIso = new Date().toISOString();
     const nextMeta = {
       ...prevMeta,
@@ -734,6 +911,12 @@ export async function handleStudioApiRequest(req, res) {
       styleLimit: limits.styleLimit,
       orderLimit: limits.orderLimit
     };
+
+    if (validityUpdate.provided) {
+      nextMeta.accessExpiresAt = validityUpdate.expiresAt;
+      nextMeta.validityLabel = validityUpdate.validityLabel;
+      nextMeta.validityPreset = validityUpdate.validityPreset;
+    }
 
     if (body.plan_status === 'active') {
       nextMeta.approvedAt = nowIso;
@@ -758,16 +941,100 @@ export async function handleStudioApiRequest(req, res) {
       return true;
     }
 
-    await syncUserSubscriptionRowToSupabase(targetUserId, {
+    const syncPayload = {
       email: getClerkPrimaryEmail(targetUser),
       plan_tier: nextTier,
       plan_status: nextStatus,
       style_limit: limits.styleLimit,
       order_limit: limits.orderLimit
-    });
+    };
+    if (validityUpdate.provided) {
+      syncPayload.current_period_end = validityUpdate.expiresAt;
+    }
+
+    await syncUserSubscriptionRowToSupabase(targetUserId, syncPayload);
 
     const row = buildMergedSubscriber(clerkPatch.data || targetUser, null);
     sendJson(res, 200, { ok: true, row });
+    return true;
+  }
+
+  // 6. Publish / Update Admin Studio Styles globally (Strictly yashrajart1999@gmail.com)
+  if (pathname === '/api/styles' && method === 'POST') {
+    if (!auth.isAdmin) {
+      sendJson(res, 403, { ok: false, error: 'Adding styles is restricted to Studio Admin' });
+      return true;
+    }
+
+    const body = await readJsonBody(req);
+    const inputList = Array.isArray(body.styles)
+      ? body.styles
+      : (body.style ? [body.style] : []);
+
+    const rows = inputList
+      .filter(s => s && typeof s === 'object' && s.title && s.prompt)
+      .map(s => {
+        const img = s.referenceImage || s.image || s.thumbnail || 'assets/prompts/01.jpeg';
+        return {
+          id: Number(s.id) || (Date.now() * 100 + Math.floor(Math.random() * 100)),
+          user_id: auth.user.id,
+          title: String(s.title).trim(),
+          category: String(s.category || 'Other').trim(),
+          prompt: String(s.prompt).trim(),
+          reference_image: img,
+          thumbnail: s.thumbnail || img,
+          aspect_ratio: String(s.aspectRatio || '2:3'),
+          description: String(s.description || ''),
+          tags: Array.isArray(s.tags) ? s.tags : [],
+          is_custom: true,
+          created_at: s.createdAt || new Date().toISOString()
+        };
+      });
+
+    if (rows.length === 0) {
+      sendJson(res, 400, { ok: false, error: 'No valid style payload provided' });
+      return true;
+    }
+
+    const supaRes = await supaRest('studio_styles?on_conflict=id', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=representation',
+      body: rows
+    });
+
+    if (!supaRes.ok) {
+      sendJson(res, 500, { ok: false, error: supaRes.error || 'Failed to publish style to Supabase' });
+      return true;
+    }
+
+    sendJson(res, 200, { ok: true, count: rows.length });
+    return true;
+  }
+
+  // 7. Delete Admin Studio Style globally (Strictly yashrajart1999@gmail.com)
+  if (pathname === '/api/styles' && method === 'DELETE') {
+    if (!auth.isAdmin) {
+      sendJson(res, 403, { ok: false, error: 'Deleting styles is restricted to Studio Admin' });
+      return true;
+    }
+
+    const parsedUrl = new URL(rawUrl, 'http://localhost');
+    const body = await readJsonBody(req);
+    const id = Number(parsedUrl.searchParams.get('id') || body.id);
+    if (!id) {
+      sendJson(res, 400, { ok: false, error: 'Missing style id' });
+      return true;
+    }
+
+    const delRes = await supaRest(`studio_styles?id=eq.${encodeURIComponent(String(id))}`, {
+      method: 'DELETE'
+    });
+    if (!delRes.ok) {
+      sendJson(res, 500, { ok: false, error: delRes.error || 'Failed to delete style' });
+      return true;
+    }
+
+    sendJson(res, 200, { ok: true, deletedId: id });
     return true;
   }
 

@@ -104,6 +104,7 @@ function getAppBaseUrl() {
 }
 
 export const ADMIN_EMAIL = 'yashrajart1999@gmail.com';
+export const PUBLIC_CONTACT_EMAIL = 'tech.yashrajframes@gmail.com';
 
 export function isClerkAdminUser(user) {
   if (!user) return false;
@@ -733,13 +734,28 @@ export class StudioCloudSync {
     const base = PLAN_CATALOG[tier] || PLAN_CATALOG.free;
     const isAdmin = this.isAdmin();
     const defaultStatus = isAdmin ? 'active' : 'pending';
-    const rawStatus = (this.subscription && this.subscription.plan_status) || pubMeta.planStatus || defaultStatus;
-    const isAccessAllowed = isAdmin || rawStatus === 'active';
+    const accessExpiresAt = isAdmin
+      ? null
+      : (this.subscription?.access_expires_at ?? this.subscription?.current_period_end ?? pubMeta.accessExpiresAt ?? null);
+    const expiresMs = accessExpiresAt ? Date.parse(String(accessExpiresAt)) : NaN;
+    const isExpired = !isAdmin && (
+      Boolean(this.subscription?.is_expired) ||
+      (Boolean(accessExpiresAt) && Number.isFinite(expiresMs) && expiresMs <= Date.now())
+    );
+    const baseStatus = (this.subscription && this.subscription.plan_status) || pubMeta.planStatus || defaultStatus;
+    const rawStatus = (isExpired && baseStatus === 'active') ? 'pending' : baseStatus;
+    const isAccessAllowed = isAdmin || (rawStatus === 'active' && !isExpired);
     return {
       ...base,
       status: rawStatus,
       isAdmin,
+      isExpired,
       isAccessAllowed,
+      accessExpiresAt,
+      validityLabel: isAdmin
+        ? 'Lifetime (Admin)'
+        : (this.subscription?.validity_label || pubMeta.validityLabel || (accessExpiresAt ? 'Timed Access' : 'Lifetime')),
+      validityPreset: this.subscription?.validity_preset || pubMeta.validityPreset || (accessExpiresAt ? 'custom' : 'lifetime'),
       styleLimit: Number(this.subscription?.style_limit) || base.styleLimit,
       orderLimit: Number(this.subscription?.order_limit) || base.orderLimit,
       promptCopyCount: Number(this.subscription?.prompt_copy_count ?? pubMeta.promptCopyCount) || 0,
@@ -748,19 +764,56 @@ export class StudioCloudSync {
       adminNote: this.subscription?.admin_note || pubMeta.adminNote || '',
       approvedAt: this.subscription?.approved_at || pubMeta.approvedAt || null,
       pausedAt: this.subscription?.paused_at || pubMeta.pausedAt || null,
-      currentPeriodEnd: this.subscription?.current_period_end || null
+      currentPeriodEnd: accessExpiresAt
     };
   }
 
   async refreshSubscriptionFromServer() {
     if (!this.user) return null;
+    const prevAllowed = this.isAdmin() || this.subscription?.plan_status === 'active';
+    const hadSubscription = Boolean(this.subscription);
     const res = await this.apiFetch('/api/subscription/status');
     if (res.ok && res.data?.subscription) {
       this.subscription = res.data.subscription;
+      const nextAllowed = this.isAdmin() || this.subscription?.plan_status === 'active';
       this.notifyAuthChange();
+      if (hadSubscription && prevAllowed !== nextAllowed && typeof this.callbacks.onAccessUnlocked === 'function') {
+        this.callbacks.onAccessUnlocked();
+      }
       return this.subscription;
     }
     return null;
+  }
+
+  async fetchSharedStyles() {
+    const headers = {};
+    if (this.user) {
+      const token = await this.getSessionJwt();
+      if (token) headers.Authorization = `Bearer ${token}`;
+    }
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 15000) : null;
+    try {
+      const res = await fetch('/api/styles', {
+        method: 'GET',
+        signal: controller ? controller.signal : undefined,
+        headers
+      });
+      if (!res.ok) {
+        return { ok: false, styles: null, promptUnlocked: false };
+      }
+      const data = await res.json();
+      return {
+        ok: true,
+        styles: Array.isArray(data?.styles) ? data.styles : [],
+        promptUnlocked: Boolean(data?.promptUnlocked)
+      };
+    } catch (err) {
+      console.warn('fetchSharedStyles failed:', err);
+      return { ok: false, styles: null, promptUnlocked: false };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   async bootstrapCloudState() {
@@ -771,45 +824,50 @@ export class StudioCloudSync {
       // 1. Fetch authoritative subscription & lock status from server API (zero RLS/JWT dependency)
       await this.refreshSubscriptionFromServer();
 
-      if (!this.supabase) {
-        this.notifyAuthChange();
-        return;
-      }
+      // 2. Fetch shared Admin-published studio styles via /api/styles (visible to all users; prompts gated server-side)
+      const sharedPromise = this.fetchSharedStyles();
 
-      // 2. Fetch styles, orders, and preferences in parallel from Supabase
-      const [stylesRes, ordersRes, prefsRes] = await Promise.all([
-        this.supabase
-          .from('studio_styles')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false }),
-        this.supabase
-          .from('shop_orders')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false }),
-        this.supabase
-          .from('user_preferences')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle()
-      ]);
+      let remoteOrders = [];
+      let remotePrefs = null;
 
-      const remoteStyles = Array.isArray(stylesRes.data)
-        ? stylesRes.data.map(mapStyleFromDb).filter(Boolean)
-        : [];
-      const remoteOrders = Array.isArray(ordersRes.data)
-        ? ordersRes.data.map(mapOrderFromDb).filter(Boolean)
-        : [];
-      const remotePrefs = prefsRes.data || null;
+      if (this.supabase) {
+        const [sharedStylesRes, ordersRes, prefsRes] = await Promise.all([
+          sharedPromise,
+          this.supabase
+            .from('shop_orders')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false }),
+          this.supabase
+            .from('user_preferences')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle()
+        ]);
 
-      if (typeof this.callbacks.onCloudBootstrap === 'function') {
-        await this.callbacks.onCloudBootstrap({
-          styles: remoteStyles,
-          orders: remoteOrders,
-          preferences: remotePrefs,
-          subscription: this.subscription
-        });
+        remoteOrders = Array.isArray(ordersRes.data)
+          ? ordersRes.data.map(mapOrderFromDb).filter(Boolean)
+          : [];
+        remotePrefs = prefsRes.data || null;
+
+        if (typeof this.callbacks.onCloudBootstrap === 'function') {
+          await this.callbacks.onCloudBootstrap({
+            styles: sharedStylesRes.ok ? sharedStylesRes.styles : null,
+            orders: remoteOrders,
+            preferences: remotePrefs,
+            subscription: this.subscription
+          });
+        }
+      } else {
+        const sharedStylesRes = await sharedPromise;
+        if (typeof this.callbacks.onCloudBootstrap === 'function') {
+          await this.callbacks.onCloudBootstrap({
+            styles: sharedStylesRes.ok ? sharedStylesRes.styles : null,
+            orders: remoteOrders,
+            preferences: remotePrefs,
+            subscription: this.subscription
+          });
+        }
       }
 
       this.notifyAuthChange();
@@ -942,7 +1000,7 @@ export class StudioCloudSync {
   }
 
   async fetchAdminDashboardData() {
-    if (!this.isAdmin()) return { ok: false, error: `Admin access restricted to ${ADMIN_EMAIL}` };
+    if (!this.isAdmin()) return { ok: false, error: 'Admin access restricted to Studio Admin' };
     const res = await this.apiFetch('/api/admin/dashboard');
     if (!res.ok) {
       let detail = res.data?.error || `Failed to load admin console (HTTP ${res.status || 0})`;
@@ -1041,7 +1099,13 @@ export class StudioCloudSync {
   }
 
   async upsertStyle(style) {
-    if (!this.supabase || !this.user) return { synced: false };
+    if (!this.user || !this.isAdmin()) return { synced: false };
+    const apiRes = await this.apiFetch('/api/styles', {
+      method: 'POST',
+      body: { style }
+    });
+    if (apiRes.ok) return { synced: true };
+    if (!this.supabase) return { synced: false, error: apiRes.data?.error };
     const row = mapStyleToDb(style, this.user.id);
     const { error } = await this.supabase
       .from('studio_styles')
@@ -1054,9 +1118,15 @@ export class StudioCloudSync {
   }
 
   async upsertStylesBatch(styles) {
-    if (!this.supabase || !this.user || !Array.isArray(styles) || styles.length === 0) {
+    if (!this.user || !this.isAdmin() || !Array.isArray(styles) || styles.length === 0) {
       return { synced: false };
     }
+    const apiRes = await this.apiFetch('/api/styles', {
+      method: 'POST',
+      body: { styles }
+    });
+    if (apiRes.ok) return { synced: true };
+    if (!this.supabase) return { synced: false, error: apiRes.data?.error };
     const rows = styles.map(s => mapStyleToDb(s, this.user.id));
     const { error } = await this.supabase
       .from('studio_styles')
@@ -1069,7 +1139,12 @@ export class StudioCloudSync {
   }
 
   async deleteStyle(styleId) {
-    if (!this.supabase || !this.user) return { synced: false };
+    if (!this.user || !this.isAdmin()) return { synced: false };
+    const apiRes = await this.apiFetch(`/api/styles?id=${encodeURIComponent(String(Number(styleId)))}`, {
+      method: 'DELETE'
+    });
+    if (apiRes.ok) return { synced: true };
+    if (!this.supabase) return { synced: false, error: apiRes.data?.error };
     const { error } = await this.supabase
       .from('studio_styles')
       .delete()

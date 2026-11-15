@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="42%" r="65%">
+      <stop offset="0%" stop-color="#1A1D24" />
+      <stop offset="100%" stop-color="#0B0C0E" />
+    </radialGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F2DFAF" />
+      <stop offset="50%" stop-color="#D6B879" />
+      <stop offset="100%" stop-color="#A88642" />
+    </linearGradient>
+    <linearGradient id="crimsonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF1E3C" />
+      <stop offset="100%" stop-color="#C8001D" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  <rect x="28" y="28" width="456" height="456" rx="92" fill="none" stroke="url(#goldGrad)" stroke-width="10" stroke-opacity="0.88" />
+  <rect x="48" y="48" width="416" height="416" rx="76" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-opacity="0.1" />
+  <circle cx="256" cy="256" r="146" fill="url(#crimsonGrad)" />
+  <circle cx="256" cy="256" r="146" fill="none" stroke="url(#goldGrad)" stroke-width="6" />
+  <path d="M164 188h34l34 62 34-62h34l-51 90v46h-34v-46z" fill="#FFFFFF" />
+  <path d="M294 188h66v28h-34v28h30v28h-30v52h-32z" fill="#F2DFAF" />
+</svg>

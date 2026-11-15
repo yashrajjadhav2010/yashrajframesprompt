@@ -6,7 +6,8 @@
 
 import QRCode from 'qrcode';
 import { prompts as importedPrompts, CATEGORIES as importedCategories } from './prompts.js';
-import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUser } from './src/lib/cloudSync.js';
+import { ADMIN_EMAIL, PUBLIC_CONTACT_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUser } from './src/lib/cloudSync.js';
+import { initPwaSupport } from './src/lib/pwa.js';
 
 (function () {
   'use strict';
@@ -243,6 +244,7 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
     btnAccountSignOut: document.getElementById('btnAccountSignOut'),
     lblUsageStyles: document.getElementById('lblUsageStyles'),
     lblUsageOrders: document.getElementById('lblUsageOrders'),
+    lblUsageValidity: document.getElementById('lblUsageValidity'),
     lblSyncState: document.getElementById('lblSyncState'),
     accountSyncActionBar: document.getElementById('accountSyncActionBar'),
     btnSyncLocalToCloud: document.getElementById('btnSyncLocalToCloud'),
@@ -251,6 +253,20 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
     clerkAuthHostModal: document.getElementById('clerkAuthHostModal'),
     clerkAuthHostCloseBtn: document.getElementById('clerkAuthHostCloseBtn'),
     clerkAuthMountNode: document.getElementById('clerkAuthMountNode'),
+
+    // PWA Install & Connectivity Elements
+    btnHeaderInstallApp: document.getElementById('btnHeaderInstallApp'),
+    mobSheetInstallApp: document.getElementById('mobSheetInstallApp'),
+    iosInstallGuideModal: document.getElementById('iosInstallGuideModal'),
+    iosInstallCloseBtn: document.getElementById('iosInstallCloseBtn'),
+    btnIosInstallGotIt: document.getElementById('btnIosInstallGotIt'),
+    pwaOfflineIndicator: document.getElementById('pwaOfflineIndicator'),
+
+    // Legal, Policy & Contact Modal Elements
+    studioLegalModal: document.getElementById('studioLegalModal'),
+    studioLegalCloseBtn: document.getElementById('studioLegalCloseBtn'),
+    btnLegalCopyEmail: document.getElementById('btnLegalCopyEmail'),
+    mobSheetLegalBtn: document.getElementById('mobSheetLegalBtn'),
 
     // Badges & Counters
     badgeRecentCount: document.getElementById('badge-recent-count'),
@@ -358,6 +374,10 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
     adminInspCopies: document.getElementById('adminInspCopies'),
     adminInspRedirects: document.getElementById('adminInspRedirects'),
     adminInspAssets: document.getElementById('adminInspAssets'),
+    adminInspValiditySelect: document.getElementById('adminInspValiditySelect'),
+    adminInspCustomDate: document.getElementById('adminInspCustomDate'),
+    adminInspExpiryReadout: document.getElementById('adminInspExpiryReadout'),
+    btnAdminApplyValidity: document.getElementById('btnAdminApplyValidity'),
     adminInspNoteInput: document.getElementById('adminInspNoteInput'),
     btnAdminSaveNote: document.getElementById('btnAdminSaveNote'),
     btnAdminInspApprove: document.getElementById('btnAdminInspApprove'),
@@ -657,15 +677,52 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
     return typeof cloudSync !== 'undefined' && isClerkAdminUser(cloudSync.user);
   }
 
+  function formatValiditySummary({ isAdmin = false, status = 'pending', isExpired = false, expiresAt = null } = {}) {
+    if (isAdmin) {
+      return { text: 'Lifetime (Admin)', shortText: 'Lifetime', tone: 'lifetime' };
+    }
+    const expMs = expiresAt ? Date.parse(String(expiresAt)) : NaN;
+    const pastExpiry = isExpired || (Boolean(expiresAt) && Number.isFinite(expMs) && expMs <= Date.now());
+    if (pastExpiry) {
+      const expDate = Number.isFinite(expMs)
+        ? new Date(expMs).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+        : '';
+      return {
+        text: expDate ? `Expired on ${expDate}` : 'Expired — Auto Locked',
+        shortText: expDate ? `Expired (${expDate})` : 'Expired',
+        tone: 'expired'
+      };
+    }
+    if (status === 'paused') {
+      return { text: 'Paused by Admin', shortText: 'Paused', tone: 'paused' };
+    }
+    if (status !== 'active') {
+      return { text: 'Awaiting Approval', shortText: 'Pending Approval', tone: 'pending' };
+    }
+    if (!expiresAt || !Number.isFinite(expMs)) {
+      return { text: 'Lifetime Access', shortText: 'Lifetime', tone: 'lifetime' };
+    }
+    const msLeft = Math.max(0, expMs - Date.now());
+    const daysLeft = Math.max(1, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
+    const dateStr = new Date(expMs).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    return {
+      text: `Valid till ${dateStr} (${daysLeft}d left)`,
+      shortText: `${daysLeft}d left · ${dateStr}`,
+      tone: daysLeft <= 3 ? 'expiring' : 'active'
+    };
+  }
+
   function getPromptAccessState() {
     if (typeof cloudSync === 'undefined' || !cloudSync.user) {
-      return { allowed: false, status: 'signed_out', isAdmin: false };
+      return { allowed: false, status: 'signed_out', isAdmin: false, isExpired: false, accessExpiresAt: null };
     }
     const plan = cloudSync.getActivePlanMeta();
     return {
       allowed: Boolean(plan.isAccessAllowed),
       status: plan.status || 'pending',
-      isAdmin: Boolean(plan.isAdmin)
+      isAdmin: Boolean(plan.isAdmin),
+      isExpired: Boolean(plan.isExpired),
+      accessExpiresAt: plan.accessExpiresAt || null
     };
   }
 
@@ -681,9 +738,11 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
       openClerkAuthModal('signIn');
       return false;
     }
-    const msg = access.status === 'pending'
-      ? `${actionLabel} locked — your account is awaiting manual approval from Studio Admin.`
-      : `${actionLabel} locked — your access is currently paused by Studio Admin.`;
+    const msg = access.isExpired
+      ? `${actionLabel} locked — your access validity period has expired. Contact Studio Admin to renew.`
+      : (access.status === 'pending'
+        ? `${actionLabel} locked — your account is awaiting manual approval from Studio Admin.`
+        : `${actionLabel} locked — your access is currently paused by Studio Admin.`);
     showToast(msg);
     openAccountPlanModal();
     return false;
@@ -1099,25 +1158,60 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
   // ==========================================================================
   // CLERK AUTHENTICATION & SUPABASE REALTIME SYNC
   // ==========================================================================
+  async function loadSharedStudioStyles() {
+    const res = await cloudSync.fetchSharedStyles();
+    if (!res.ok || !Array.isArray(res.styles)) return;
+    if (isAdminUser()) {
+      const remoteMap = new Map(res.styles.map(s => [Number(s.id), s]));
+      const localOnly = state.customStyles.filter(s => !remoteMap.has(Number(s.id)));
+      state.customStyles = [...res.styles, ...localOnly].sort(
+        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+      );
+      saveCustomStyles();
+    } else {
+      state.customStyles = res.styles;
+      saveCustomStyles();
+    }
+    refreshCurrentView();
+    if (state.activeModalPin) {
+      const refreshedPin = getAllPrompts().find(p => Number(p.id) === Number(state.activeModalPin.id));
+      if (refreshedPin) {
+        state.activeModalPin = refreshedPin;
+        applyModalPromptAccessUI(refreshedPin);
+      }
+    }
+  }
+
   const cloudSync = new StudioCloudSync({
-    onAuthChange: () => {
+    onAuthChange: ({ user }) => {
       updateAccountAndSubscriptionUI();
+      if (!user) {
+        void loadSharedStudioStyles();
+      }
+    },
+    onAccessUnlocked: () => {
+      void loadSharedStudioStyles();
     },
     onAuthSuccess: () => {
       closeClerkAuthModal();
       showToast('Signed in & syncing with studio cloud');
     },
     onCloudBootstrap: async ({ styles, orders, preferences }) => {
-      // Merge cloud custom styles + push any local-only styles
-      const remoteStyleMap = new Map((styles || []).map(s => [Number(s.id), s]));
-      const localOnlyStyles = state.customStyles.filter(s => !remoteStyleMap.has(Number(s.id)));
-      const mergedStyles = [...(styles || []), ...localOnlyStyles].sort(
-        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
-      );
-      state.customStyles = mergedStyles;
-      saveCustomStyles();
-      if (localOnlyStyles.length > 0) {
-        await cloudSync.upsertStylesBatch(localOnlyStyles);
+      // Shared Admin-published studio styles (Admin pushes local-only offline additions; non-admins view shared catalog)
+      if (isAdminUser()) {
+        const remoteStyleMap = new Map((styles || []).map(s => [Number(s.id), s]));
+        const localOnlyStyles = state.customStyles.filter(s => !remoteStyleMap.has(Number(s.id)));
+        const mergedStyles = [...(styles || []), ...localOnlyStyles].sort(
+          (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+        );
+        state.customStyles = mergedStyles;
+        saveCustomStyles();
+        if (localOnlyStyles.length > 0) {
+          await cloudSync.upsertStylesBatch(localOnlyStyles);
+        }
+      } else if (Array.isArray(styles)) {
+        state.customStyles = styles;
+        saveCustomStyles();
       }
 
       // Merge cloud orders + push local-only orders
@@ -1155,7 +1249,11 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
         }
         if (preferences.shop_contact && Object.keys(preferences.shop_contact).length > 0) {
           try {
-            localStorage.setItem(STORAGE_KEYS.SHOP_CONTACT, JSON.stringify({ ...getShopContactConfig(), ...preferences.shop_contact }));
+            const mergedContact = { ...getShopContactConfig(), ...preferences.shop_contact };
+            if (String(mergedContact.email || '').trim().toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+              mergedContact.email = PUBLIC_CONTACT_EMAIL;
+            }
+            localStorage.setItem(STORAGE_KEYS.SHOP_CONTACT, JSON.stringify(mergedContact));
           } catch {}
         }
       }
@@ -1283,6 +1381,8 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
         dom.lblHeaderPlanBadge.textContent = 'Sign In';
       } else if (plan.status === 'paused') {
         dom.lblHeaderPlanBadge.textContent = `${plan.badge} · Paused`;
+      } else if (plan.isExpired) {
+        dom.lblHeaderPlanBadge.textContent = `${plan.badge} · Expired`;
       } else if (plan.status === 'pending') {
         dom.lblHeaderPlanBadge.textContent = `${plan.badge} · Pending`;
       } else {
@@ -1370,16 +1470,30 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
     if (dom.accountStatusBanner) {
       if (user && isLocked) {
         dom.accountStatusBanner.style.display = 'flex';
-        dom.accountStatusBanner.classList.toggle('is-pending', plan.status === 'pending');
+        dom.accountStatusBanner.classList.toggle('is-pending', plan.status === 'pending' && !plan.isExpired);
         if (dom.lblAccountStatusTitle) {
-          dom.lblAccountStatusTitle.textContent = plan.status === 'pending'
-            ? 'Pending Manual Admin Approval'
-            : 'Access Paused — Prompts & Redirects Locked';
+          if (plan.isExpired) {
+            dom.lblAccountStatusTitle.textContent = 'Access Validity Expired — Renewal Needed';
+          } else if (plan.status === 'pending') {
+            dom.lblAccountStatusTitle.textContent = 'Pending Manual Admin Approval';
+          } else {
+            dom.lblAccountStatusTitle.textContent = 'Access Paused — Prompts & Redirects Locked';
+          }
         }
         if (dom.lblAccountStatusMsg) {
-          dom.lblAccountStatusMsg.textContent = plan.status === 'pending'
-            ? `Your account is queued for manual verification by Studio Admin (${ADMIN_EMAIL}). Once approved, prompt viewing, copying, and AI Auto Take unlock automatically.`
-            : `Prompt viewing, copying, and AI Auto Take redirects are disabled while paused. Contact Studio Admin (${ADMIN_EMAIL}) to reactivate.`;
+          if (plan.isExpired) {
+            const valSummary = formatValiditySummary({
+              isAdmin: false,
+              status: plan.status,
+              isExpired: true,
+              expiresAt: plan.accessExpiresAt
+            });
+            dom.lblAccountStatusMsg.textContent = `${valSummary.text}. Your account has been automatically locked. Contact Studio Admin (${PUBLIC_CONTACT_EMAIL}) to extend your validity.`;
+          } else if (plan.status === 'pending') {
+            dom.lblAccountStatusMsg.textContent = `Your account is queued for manual verification by Studio Admin (${PUBLIC_CONTACT_EMAIL}). Once approved, prompt viewing, copying, and AI Auto Take unlock automatically.`;
+          } else {
+            dom.lblAccountStatusMsg.textContent = `Prompt viewing, copying, and AI Auto Take redirects are disabled while paused. Contact Studio Admin (${PUBLIC_CONTACT_EMAIL}) to reactivate.`;
+          }
         }
       } else {
         dom.accountStatusBanner.style.display = 'none';
@@ -1405,6 +1519,15 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
       }
       if (dom.lblUsageOrders) {
         dom.lblUsageOrders.textContent = `${state.shopOrders.length} / ${plan.orderLimit}`;
+      }
+      if (dom.lblUsageValidity) {
+        const vSummary = formatValiditySummary({
+          isAdmin: plan.isAdmin,
+          status: plan.status,
+          isExpired: plan.isExpired,
+          expiresAt: plan.accessExpiresAt
+        });
+        dom.lblUsageValidity.textContent = vSummary.shortText;
       }
       if (dom.lblSyncState) {
         dom.lblSyncState.textContent = status.supabaseConfigured
@@ -1478,16 +1601,26 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
   // ==========================================================================
   const DEFAULT_SHOP_CONTACT = {
     phone: '',
-    email: 'yashrajart1999@gmail.com',
+    email: PUBLIC_CONTACT_EMAIL,
     hours: 'Mon–Sat, 10:00 AM – 8:30 PM',
     address: 'Yashraj Frames Custom Framing & AI Photo Studio'
   };
+
+  function sanitizePublicEmail(email) {
+    const clean = String(email || '').trim();
+    if (!clean || clean.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+      return PUBLIC_CONTACT_EMAIL;
+    }
+    return clean;
+  }
 
   function getShopContactConfig() {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.SHOP_CONTACT);
       if (raw) {
-        return { ...DEFAULT_SHOP_CONTACT, ...JSON.parse(raw) };
+        const parsed = { ...DEFAULT_SHOP_CONTACT, ...JSON.parse(raw) };
+        parsed.email = sanitizePublicEmail(parsed.email);
+        return parsed;
       }
     } catch (e) {
       // ignore storage read error
@@ -1888,7 +2021,7 @@ Thank you for trusting us with your precious memories!`;
 
     const contact = {
       phone: orderData.sp || orderData.contact?.phone || getShopContactConfig().phone || '',
-      email: orderData.se || orderData.contact?.email || getShopContactConfig().email || DEFAULT_SHOP_CONTACT.email,
+      email: sanitizePublicEmail(orderData.se || orderData.contact?.email || getShopContactConfig().email || DEFAULT_SHOP_CONTACT.email),
       hours: orderData.sh || orderData.contact?.hours || getShopContactConfig().hours || DEFAULT_SHOP_CONTACT.hours,
       address: orderData.sa || orderData.contact?.address || getShopContactConfig().address || DEFAULT_SHOP_CONTACT.address
     };
@@ -2169,7 +2302,7 @@ Thank you for trusting us with your precious memories!`;
 
       ctx.fillStyle = '#9298A3';
       ctx.font = 'normal 16px sans-serif';
-      ctx.fillText('yashrajart1999@gmail.com · Client Proof Mockup', 1120, 1145);
+      ctx.fillText(`${PUBLIC_CONTACT_EMAIL} · Client Proof Mockup`, 1120, 1145);
 
       // Trigger download
       try {
@@ -2251,7 +2384,7 @@ Thank you for trusting us with your precious memories!`;
   // ==========================================================================
   function openAddStyleModal() {
     if (!isAdminUser()) {
-      showToast(`Add Style is restricted to Studio Admin (${ADMIN_EMAIL})`);
+      showToast('Add Style is restricted to Studio Admin');
       return;
     }
     if (!dom.addStyleModal) return;
@@ -2270,7 +2403,7 @@ Thank you for trusting us with your precious memories!`;
 
   async function handleSaveCustomStyle() {
     if (!isAdminUser()) {
-      showToast(`Saving custom styles is restricted to Studio Admin (${ADMIN_EMAIL})`);
+      showToast('Saving custom styles is restricted to Studio Admin');
       closeAddStyleModal();
       return;
     }
@@ -2327,17 +2460,17 @@ Thank you for trusting us with your precious memories!`;
     closeAddStyleModal();
     refreshCurrentView();
 
-    if (cloudSync.user && cloudSync.supabase) {
+    if (cloudSync.user) {
       const res = await cloudSync.upsertStyle(newStyle);
-      showToast(res.synced ? `Saved & synced "${title}" to cloud!` : `Saved "${title}" locally (cloud sync retry queued)`);
+      showToast(res.synced ? `Published "${title}" to all studio users!` : `Saved "${title}" locally (cloud sync retry queued)`);
     } else {
-      showToast(`Saved "${title}" locally! Sign in to sync across mobile & desktop.`);
+      showToast(`Saved "${title}" locally! Sign in to publish across all users.`);
     }
   }
 
   async function deleteCustomStyle(pinId) {
     if (!isAdminUser()) {
-      showToast(`Deleting custom styles is restricted to Studio Admin (${ADMIN_EMAIL})`);
+      showToast('Deleting custom styles is restricted to Studio Admin');
       return;
     }
     const id = Number(pinId);
@@ -2349,9 +2482,9 @@ Thank you for trusting us with your precious memories!`;
     closePinModal();
     refreshCurrentView();
 
-    if (cloudSync.user && cloudSync.supabase) {
+    if (cloudSync.user) {
       await cloudSync.deleteStyle(id);
-      showToast(`Deleted "${target.title}" across synced devices`);
+      showToast(`Deleted "${target.title}" across all studio users`);
     } else {
       showToast(`Deleted "${target.title}"`);
     }
@@ -2359,7 +2492,7 @@ Thank you for trusting us with your precious memories!`;
 
   function exportCustomStylesJson() {
     if (!isAdminUser()) {
-      showToast(`Exporting custom styles is restricted to Studio Admin (${ADMIN_EMAIL})`);
+      showToast('Exporting custom styles is restricted to Studio Admin');
       return;
     }
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.customStyles, null, 2));
@@ -2372,7 +2505,7 @@ Thank you for trusting us with your precious memories!`;
 
   function importCustomStylesJson(file) {
     if (!isAdminUser()) {
-      showToast(`Importing custom styles is restricted to Studio Admin (${ADMIN_EMAIL})`);
+      showToast('Importing custom styles is restricted to Studio Admin');
       return;
     }
     if (!file) return;
@@ -2393,7 +2526,7 @@ Thank you for trusting us with your precious memories!`;
           saveCustomStyles();
           refreshCurrentView();
           closeAddStyleModal();
-          if (added.length > 0 && cloudSync.user && cloudSync.supabase) {
+          if (added.length > 0 && cloudSync.user) {
             await cloudSync.upsertStylesBatch(added);
           }
           showToast(`Imported ${added.length} styles successfully!`);
@@ -3139,7 +3272,16 @@ Looking forward to welcoming you! Thank you.`);
           const isSelected = state.admin.selectedUserId === u.user_id;
           const displayName = u.full_name || (u.email ? u.email.split('@')[0] : 'Studio Member');
           const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'U';
-          const statusText = status === 'paused' ? 'Paused' : (status === 'pending' ? 'Pending' : 'Active');
+          const statusText = u.is_expired ? 'Expired' : (status === 'paused' ? 'Paused' : (status === 'pending' ? 'Pending' : 'Active'));
+          const validityMeta = formatValiditySummary({
+            isAdmin: isSelfAdmin,
+            status,
+            isExpired: Boolean(u.is_expired),
+            expiresAt: u.access_expires_at || u.current_period_end || null
+          });
+          const rowPreset = ['7d', '30d', '90d', '365d', 'lifetime'].includes(u.validity_preset)
+            ? u.validity_preset
+            : (status === 'active' && !u.access_expires_at ? 'lifetime' : '30d');
 
           return `
             <tr class="${isSelected ? 'is-selected' : ''}" data-admin-row="${escapeHtml(u.user_id)}">
@@ -3163,22 +3305,34 @@ Looking forward to welcoming you! Thank you.`);
                 </select>
               </td>
               <td>
-                <span class="admin-status-tag status-${escapeHtml(status)}">${escapeHtml(statusText)}</span>
+                <div class="admin-status-cell">
+                  <span class="admin-status-tag status-${escapeHtml(u.is_expired ? 'paused' : status)}">${escapeHtml(statusText)}</span>
+                  <span class="admin-validity-sub validity-${escapeHtml(validityMeta.tone)}">${escapeHtml(validityMeta.shortText)}</span>
+                </div>
               </td>
               <td class="num-col"><strong>${Number(u.prompt_copy_count) || 0}</strong></td>
               <td class="num-col">${Number(u.ai_redirect_count) || 0}</td>
               <td>${escapeHtml(formatRelativeTime(u.last_active_at || u.updated_at || u.created_at))}</td>
               <td class="actions-col">
                 <div class="admin-row-actions">
+                  ${isSelfAdmin ? '' : `
+                    <select class="admin-validity-select" data-admin-validity-user="${escapeHtml(u.user_id)}" aria-label="Select access validity for ${escapeHtml(u.email || u.user_id)}">
+                      <option value="7d" ${rowPreset === '7d' ? 'selected' : ''}>7 Days</option>
+                      <option value="30d" ${rowPreset === '30d' ? 'selected' : ''}>30 Days</option>
+                      <option value="90d" ${rowPreset === '90d' ? 'selected' : ''}>90 Days</option>
+                      <option value="365d" ${rowPreset === '365d' ? 'selected' : ''}>1 Year</option>
+                      <option value="lifetime" ${rowPreset === 'lifetime' ? 'selected' : ''}>Lifetime</option>
+                    </select>
+                  `}
                   <button
                     type="button"
                     class="admin-btn-approve"
                     data-admin-approve="${escapeHtml(u.user_id)}"
-                    ${status === 'active' ? 'disabled' : ''}
-                    title="Approve subscription and unlock prompts, copy & AI redirect"
+                    ${isSelfAdmin ? 'disabled' : ''}
+                    title="${status === 'active' ? 'Apply updated validity / renew access' : 'Approve with selected validity & unlock prompts'}"
                   >
                     <svg style="width: 13px; height: 13px;"><use href="#icon-check"></use></svg>
-                    <span>Approve</span>
+                    <span>${status === 'active' ? 'Renew' : 'Approve'}</span>
                   </button>
                   <button
                     type="button"
@@ -3214,14 +3368,45 @@ Looking forward to welcoming you! Thank you.`);
         if (dom.adminInspName) dom.adminInspName.textContent = selectedUser.full_name || 'Studio Subscriber';
         if (dom.adminInspEmail) dom.adminInspEmail.textContent = selectedUser.email || selectedUser.user_id;
         if (dom.adminInspStatusTag) {
-          dom.adminInspStatusTag.className = `admin-status-tag status-${st}`;
-          dom.adminInspStatusTag.textContent = st === 'paused' ? 'Paused' : (st === 'pending' ? 'Pending' : 'Active');
+          dom.adminInspStatusTag.className = `admin-status-tag status-${selectedUser.is_expired ? 'paused' : st}`;
+          dom.adminInspStatusTag.textContent = selectedUser.is_expired ? 'Expired' : (st === 'paused' ? 'Paused' : (st === 'pending' ? 'Pending' : 'Active'));
         }
         if (dom.adminInspCopies) dom.adminInspCopies.textContent = String(Number(selectedUser.prompt_copy_count) || 0);
         if (dom.adminInspRedirects) dom.adminInspRedirects.textContent = String(Number(selectedUser.ai_redirect_count) || 0);
         if (dom.adminInspAssets) dom.adminInspAssets.textContent = `${selectedUser.customStyleCount || 0} / ${selectedUser.shopOrderCount || 0}`;
+
+        const inspValidity = formatValiditySummary({
+          isAdmin: isSelf,
+          status: st,
+          isExpired: Boolean(selectedUser.is_expired),
+          expiresAt: selectedUser.access_expires_at || selectedUser.current_period_end || null
+        });
+        if (dom.adminInspExpiryReadout) {
+          dom.adminInspExpiryReadout.textContent = inspValidity.text;
+          dom.adminInspExpiryReadout.className = `admin-validity-readout validity-${inspValidity.tone}`;
+        }
+        if (dom.adminInspValiditySelect) {
+          const inspPreset = isSelf
+            ? 'lifetime'
+            : (['7d', '30d', '90d', '365d', 'lifetime', 'custom'].includes(selectedUser.validity_preset)
+              ? selectedUser.validity_preset
+              : (selectedUser.access_expires_at ? 'custom' : (st === 'active' ? 'lifetime' : '30d')));
+          dom.adminInspValiditySelect.value = inspPreset;
+          dom.adminInspValiditySelect.disabled = isSelf;
+          if (dom.adminInspCustomDate) {
+            const showCustom = !isSelf && inspPreset === 'custom';
+            dom.adminInspCustomDate.style.display = showCustom ? 'block' : 'none';
+            if (showCustom && selectedUser.access_expires_at) {
+              dom.adminInspCustomDate.value = String(selectedUser.access_expires_at).slice(0, 10);
+            }
+          }
+        }
+        if (dom.btnAdminApplyValidity) dom.btnAdminApplyValidity.disabled = isSelf;
         if (dom.adminInspNoteInput) dom.adminInspNoteInput.value = selectedUser.admin_note || '';
-        if (dom.btnAdminInspApprove) dom.btnAdminInspApprove.disabled = st === 'active';
+        if (dom.btnAdminInspApprove) {
+          dom.btnAdminInspApprove.disabled = isSelf;
+          dom.btnAdminInspApprove.textContent = st === 'active' ? 'Renew' : 'Approve';
+        }
         if (dom.btnAdminInspPause) dom.btnAdminInspPause.disabled = st === 'paused' || isSelf;
 
         if (dom.adminUserSpecificLogs) {
@@ -3304,9 +3489,37 @@ Looking forward to welcoming you! Thank you.`);
     renderAdminDashboard();
   }
 
-  async function handleAdminStatusAction(userId, nextStatus) {
+  function buildAdminValidityPayload(userId, source = 'row') {
+    if (source === 'inspector' && dom.adminInspValiditySelect) {
+      const preset = dom.adminInspValiditySelect.value || '30d';
+      if (preset === 'custom') {
+        const customDate = dom.adminInspCustomDate ? dom.adminInspCustomDate.value.trim() : '';
+        if (!customDate) {
+          return { error: 'Please select a custom expiry date' };
+        }
+        return { access_expires_at: customDate };
+      }
+      return { validity_preset: preset };
+    }
+    const rowSelect = dom.adminUsersTableBody?.querySelector(`[data-admin-validity-user="${CSS.escape(String(userId))}"]`);
+    if (rowSelect && rowSelect.value) {
+      return { validity_preset: rowSelect.value };
+    }
+    return { validity_preset: '30d' };
+  }
+
+  async function handleAdminStatusAction(userId, nextStatus, source = 'row') {
     if (!isAdminUser() || !userId) return;
-    const res = await cloudSync.adminUpdateSubscription(userId, { plan_status: nextStatus });
+    const payload = { plan_status: nextStatus };
+    if (nextStatus === 'active') {
+      const validityPayload = buildAdminValidityPayload(userId, source);
+      if (validityPayload.error) {
+        showToast(validityPayload.error);
+        return;
+      }
+      Object.assign(payload, validityPayload);
+    }
+    const res = await cloudSync.adminUpdateSubscription(userId, payload);
     if (!res.ok) {
       showToast(`Admin update failed: ${res.error || 'Check Supabase RLS policies'}`);
       return;
@@ -3316,9 +3529,49 @@ Looking forward to welcoming you! Thank you.`);
       state.admin.users[idx] = { ...state.admin.users[idx], ...res.row };
     }
     renderAdminDashboard();
-    showToast(nextStatus === 'active'
-      ? 'Subscription Approved — prompts & AI redirect unlocked!'
-      : 'Subscription Paused — prompts, copy & AI redirect locked!');
+    if (nextStatus === 'active') {
+      const vBadge = formatValiditySummary({
+        isAdmin: false,
+        status: 'active',
+        isExpired: Boolean(res.row?.is_expired),
+        expiresAt: res.row?.access_expires_at || null
+      });
+      showToast(`Approved (${vBadge.shortText}) — prompts & AI redirect unlocked!`);
+    } else {
+      showToast('Subscription Paused — prompts, copy & AI redirect locked!');
+    }
+  }
+
+  async function handleAdminApplyValidity() {
+    if (!isAdminUser() || !state.admin.selectedUserId) return;
+    const userId = state.admin.selectedUserId;
+    const validityPayload = buildAdminValidityPayload(userId, 'inspector');
+    if (validityPayload.error) {
+      showToast(validityPayload.error);
+      return;
+    }
+    const selectedUser = state.admin.users.find(u => u.user_id === userId);
+    const shouldActivate = !selectedUser || selectedUser.plan_status !== 'paused';
+    const res = await cloudSync.adminUpdateSubscription(userId, {
+      ...validityPayload,
+      ...(shouldActivate ? { plan_status: 'active' } : {})
+    });
+    if (!res.ok) {
+      showToast(`Validity update failed: ${res.error || 'Error'}`);
+      return;
+    }
+    const idx = state.admin.users.findIndex(u => u.user_id === userId);
+    if (idx >= 0 && res.row) {
+      state.admin.users[idx] = { ...state.admin.users[idx], ...res.row };
+    }
+    renderAdminDashboard();
+    const vBadge = formatValiditySummary({
+      isAdmin: false,
+      status: res.row?.plan_status || 'active',
+      isExpired: Boolean(res.row?.is_expired),
+      expiresAt: res.row?.access_expires_at || null
+    });
+    showToast(`Access validity updated: ${vBadge.text}`);
   }
 
   async function handleAdminTierChange(userId, nextTier) {
@@ -3360,7 +3613,7 @@ Looking forward to welcoming you! Thank you.`);
       showToast('No subscriber rows to export');
       return;
     }
-    const header = ['Email', 'Full Name', 'Plan Tier', 'Status', 'Prompts Copied', 'AI Redirects', 'Custom Styles', 'Shop Orders', 'Last Prompt', 'Last Active', 'Admin Note'];
+    const header = ['Email', 'Full Name', 'Plan Tier', 'Status', 'Validity', 'Access Expires At', 'Prompts Copied', 'AI Redirects', 'Custom Styles', 'Shop Orders', 'Last Prompt', 'Last Active', 'Admin Note'];
     const csvCell = (val) => `"${String(val ?? '').replace(/"/g, '""')}"`;
     const lines = [
       header.map(csvCell).join(','),
@@ -3368,7 +3621,9 @@ Looking forward to welcoming you! Thank you.`);
         u.email || u.user_id,
         u.full_name || '',
         u.plan_tier || 'free',
-        u.plan_status || 'active',
+        u.is_expired ? 'expired' : (u.plan_status || 'active'),
+        u.validity_label || 'Lifetime',
+        u.access_expires_at || 'Lifetime',
         Number(u.prompt_copy_count) || 0,
         Number(u.ai_redirect_count) || 0,
         Number(u.customStyleCount) || 0,
@@ -3496,6 +3751,8 @@ Looking forward to welcoming you! Thank you.`);
         if (dom.lblModalLockTitle) {
           if (access.status === 'signed_out') {
             dom.lblModalLockTitle.textContent = 'Sign In & Admin Approval Required';
+          } else if (access.isExpired) {
+            dom.lblModalLockTitle.textContent = 'Access Validity Expired';
           } else if (access.status === 'pending') {
             dom.lblModalLockTitle.textContent = 'Awaiting Manual Admin Approval';
           } else {
@@ -3504,16 +3761,26 @@ Looking forward to welcoming you! Thank you.`);
         }
         if (dom.lblModalLockDesc) {
           if (access.status === 'signed_out') {
-            dom.lblModalLockDesc.textContent = `You must sign in and be manually approved by Studio Admin (${ADMIN_EMAIL}) before viewing prompts, copying, or using AI Auto Take.`;
+            dom.lblModalLockDesc.textContent = `You must sign in and be manually approved by Studio Admin (${PUBLIC_CONTACT_EMAIL}) before viewing prompts, copying, or using AI Auto Take.`;
+          } else if (access.isExpired) {
+            const valSummary = formatValiditySummary({
+              isAdmin: false,
+              status: access.status,
+              isExpired: true,
+              expiresAt: access.accessExpiresAt
+            });
+            dom.lblModalLockDesc.textContent = `${valSummary.text}. Please contact Studio Admin (${PUBLIC_CONTACT_EMAIL}) to renew your studio prompt access.`;
           } else if (access.status === 'pending') {
-            dom.lblModalLockDesc.textContent = `You are signed in and queued for manual verification by Studio Admin (${ADMIN_EMAIL}). Prompt viewing, copying, and AI Auto Take unlock immediately once approved.`;
+            dom.lblModalLockDesc.textContent = `You are signed in and queued for manual verification by Studio Admin (${PUBLIC_CONTACT_EMAIL}). Prompt viewing, copying, and AI Auto Take unlock immediately once approved.`;
           } else {
-            dom.lblModalLockDesc.textContent = `Viewing, copying AI prompts, and AI Auto Take redirects are disabled while your access is paused. Please contact Studio Admin (${ADMIN_EMAIL}) to reactivate.`;
+            dom.lblModalLockDesc.textContent = `Viewing, copying AI prompts, and AI Auto Take redirects are disabled while your access is paused. Please contact Studio Admin (${PUBLIC_CONTACT_EMAIL}) to reactivate.`;
           }
         }
         if (dom.lblModalLockAccountBtn) {
           if (access.status === 'signed_out') {
             dom.lblModalLockAccountBtn.textContent = 'Sign In to Request Access';
+          } else if (access.isExpired) {
+            dom.lblModalLockAccountBtn.textContent = 'View Renewal Details';
           } else if (access.status === 'pending') {
             dom.lblModalLockAccountBtn.textContent = 'View Approval Status';
           } else {
@@ -4016,7 +4283,7 @@ Looking forward to welcoming you! Thank you.`);
         const res = await cloudSync.requestSubscriptionUpgrade(tier);
         updateAccountAndSubscriptionUI();
         if (res.ok) {
-          showToast(`Subscription request sent to ${ADMIN_EMAIL} for approval!`);
+          showToast(`Subscription request sent to Studio Admin (${PUBLIC_CONTACT_EMAIL}) for approval!`);
         } else {
           showToast(`Unable to send request: ${res.error || 'Check Supabase connection'}`);
         }
@@ -4106,16 +4373,16 @@ Looking forward to welcoming you! Thank you.`);
         const approveBtn = e.target.closest('[data-admin-approve]');
         if (approveBtn) {
           e.stopPropagation();
-          handleAdminStatusAction(approveBtn.getAttribute('data-admin-approve'), 'active');
+          handleAdminStatusAction(approveBtn.getAttribute('data-admin-approve'), 'active', 'row');
           return;
         }
         const pauseBtn = e.target.closest('[data-admin-pause]');
         if (pauseBtn) {
           e.stopPropagation();
-          handleAdminStatusAction(pauseBtn.getAttribute('data-admin-pause'), 'paused');
+          handleAdminStatusAction(pauseBtn.getAttribute('data-admin-pause'), 'paused', 'row');
           return;
         }
-        if (e.target.closest('.admin-tier-select')) return;
+        if (e.target.closest('.admin-tier-select') || e.target.closest('.admin-validity-select')) return;
         const row = e.target.closest('[data-admin-row]');
         if (row) {
           state.admin.selectedUserId = row.getAttribute('data-admin-row');
@@ -4124,21 +4391,37 @@ Looking forward to welcoming you! Thank you.`);
       });
       dom.adminUsersTableBody.addEventListener('change', (e) => {
         const tierSelect = e.target.closest('[data-admin-tier-user]');
-        if (!tierSelect) return;
-        handleAdminTierChange(tierSelect.getAttribute('data-admin-tier-user'), tierSelect.value);
+        if (tierSelect) {
+          handleAdminTierChange(tierSelect.getAttribute('data-admin-tier-user'), tierSelect.value);
+        }
       });
+    }
+    if (dom.adminInspValiditySelect) {
+      dom.adminInspValiditySelect.addEventListener('change', () => {
+        if (dom.adminInspCustomDate) {
+          const isCustom = dom.adminInspValiditySelect.value === 'custom';
+          dom.adminInspCustomDate.style.display = isCustom ? 'block' : 'none';
+          if (isCustom && !dom.adminInspCustomDate.value) {
+            const d = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            dom.adminInspCustomDate.value = d.toISOString().slice(0, 10);
+          }
+        }
+      });
+    }
+    if (dom.btnAdminApplyValidity) {
+      dom.btnAdminApplyValidity.addEventListener('click', handleAdminApplyValidity);
     }
     if (dom.btnAdminSaveNote) {
       dom.btnAdminSaveNote.addEventListener('click', handleAdminSaveNote);
     }
     if (dom.btnAdminInspApprove) {
       dom.btnAdminInspApprove.addEventListener('click', () => {
-        if (state.admin.selectedUserId) handleAdminStatusAction(state.admin.selectedUserId, 'active');
+        if (state.admin.selectedUserId) handleAdminStatusAction(state.admin.selectedUserId, 'active', 'inspector');
       });
     }
     if (dom.btnAdminInspPause) {
       dom.btnAdminInspPause.addEventListener('click', () => {
-        if (state.admin.selectedUserId) handleAdminStatusAction(state.admin.selectedUserId, 'paused');
+        if (state.admin.selectedUserId) handleAdminStatusAction(state.admin.selectedUserId, 'paused', 'inspector');
       });
     }
     if (dom.btnModalDeleteCustom) {
@@ -4488,6 +4771,84 @@ Looking forward to welcoming you! Thank you.`);
         switchView('history');
       });
     }
+    if (dom.mobSheetInstallApp) {
+      dom.mobSheetInstallApp.addEventListener('click', () => {
+        closeMobileToolsSheet();
+      });
+    }
+
+    // Legal, Policy & Contact Modal Helpers
+    function setActiveLegalTab(tabName = 'terms') {
+      const targetTab = ['terms', 'privacy', 'contact'].includes(tabName) ? tabName : 'terms';
+      if (!dom.studioLegalModal) return;
+      dom.studioLegalModal.querySelectorAll('[data-legal-tab]').forEach(btn => {
+        const isActive = btn.getAttribute('data-legal-tab') === targetTab;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+      dom.studioLegalModal.querySelectorAll('[data-legal-panel]').forEach(panel => {
+        panel.classList.toggle('active', panel.getAttribute('data-legal-panel') === targetTab);
+      });
+    }
+
+    function openStudioLegalModal(tabName = 'terms') {
+      if (!dom.studioLegalModal) return;
+      if (dom.accountPlanModal && dom.accountPlanModal.classList.contains('active')) {
+        closeAccountPlanModal();
+      }
+      setActiveLegalTab(tabName);
+      dom.studioLegalModal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeStudioLegalModal() {
+      if (!dom.studioLegalModal) return;
+      dom.studioLegalModal.classList.remove('active');
+      if (!state.activeModalPin && (!dom.accountPlanModal || !dom.accountPlanModal.classList.contains('active'))) {
+        document.body.style.overflow = '';
+      }
+      if (['#terms', '#privacy', '#contact'].includes(window.location.hash)) {
+        window.history.replaceState(null, '', `#${state.currentView || 'home'}`);
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      const trigger = e.target.closest('[data-legal-open]');
+      if (trigger) {
+        const tab = trigger.getAttribute('data-legal-open') || 'terms';
+        openStudioLegalModal(tab);
+        return;
+      }
+      const tabBtn = e.target.closest('#studioLegalModal [data-legal-tab]');
+      if (tabBtn) {
+        setActiveLegalTab(tabBtn.getAttribute('data-legal-tab'));
+      }
+    });
+
+    if (dom.studioLegalCloseBtn) {
+      dom.studioLegalCloseBtn.addEventListener('click', closeStudioLegalModal);
+    }
+    if (dom.studioLegalModal) {
+      dom.studioLegalModal.addEventListener('click', (e) => {
+        if (e.target === dom.studioLegalModal) closeStudioLegalModal();
+      });
+    }
+    if (dom.mobSheetLegalBtn) {
+      dom.mobSheetLegalBtn.addEventListener('click', () => {
+        closeMobileToolsSheet();
+        openStudioLegalModal('terms');
+      });
+    }
+    if (dom.btnLegalCopyEmail) {
+      dom.btnLegalCopyEmail.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(PUBLIC_CONTACT_EMAIL);
+          showToast(`Copied ${PUBLIC_CONTACT_EMAIL}`);
+        } catch {
+          showToast(PUBLIC_CONTACT_EMAIL);
+        }
+      });
+    }
 
     // 8. Lightbox Handlers
     dom.lightboxCloseBtn.addEventListener('click', closeLightbox);
@@ -4498,7 +4859,9 @@ Looking forward to welcoming you! Thank you.`);
     // 9. Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        if (dom.mobileToolsSheet && dom.mobileToolsSheet.classList.contains('active')) closeMobileToolsSheet();
+        if (dom.studioLegalModal && dom.studioLegalModal.classList.contains('active')) closeStudioLegalModal();
+        else if (dom.iosInstallGuideModal && dom.iosInstallGuideModal.classList.contains('active')) dom.iosInstallGuideModal.classList.remove('active');
+        else if (dom.mobileToolsSheet && dom.mobileToolsSheet.classList.contains('active')) closeMobileToolsSheet();
         else if (dom.accountPlanModal && dom.accountPlanModal.classList.contains('active')) closeAccountPlanModal();
         else if (dom.aiAutoTakeModal && dom.aiAutoTakeModal.classList.contains('active')) closeAiLauncherModal();
         else if (dom.presetPickerModal && dom.presetPickerModal.classList.contains('active')) closePresetPicker();
@@ -4528,10 +4891,16 @@ Looking forward to welcoming you! Thank you.`);
         if (dom.clientReceiptPortal) dom.clientReceiptPortal.style.display = 'none';
       }
       const cleanHash = hash.replace('#', '');
+      if (['terms', 'privacy', 'contact'].includes(cleanHash)) {
+        openStudioLegalModal(cleanHash);
+        return;
+      }
       if (cleanHash && ['home', 'explore', 'boards', 'framing', 'saved', 'history', 'admin'].includes(cleanHash)) {
         if (state.currentView !== cleanHash) switchView(cleanHash);
       }
     });
+
+    return { openStudioLegalModal };
   }
 
   function escapeHtml(str) {
@@ -4552,8 +4921,31 @@ Looking forward to welcoming you! Thank you.`);
     updateHeaderAiIndicator();
     updateAccountAndSubscriptionUI();
     renderCategoryChips();
-    setupEventListeners();
+    const { openStudioLegalModal } = setupEventListeners();
+    initPwaSupport({
+      installButtons: [dom.btnHeaderInstallApp, dom.mobSheetInstallApp],
+      iosGuideModal: dom.iosInstallGuideModal,
+      iosGuideCloseBtn: dom.iosInstallCloseBtn,
+      iosGuideGotItBtn: dom.btnIosInstallGotIt,
+      offlineIndicator: dom.pwaOfflineIndicator,
+      onToast: showToast
+    });
     cloudSync.init();
+    void loadSharedStudioStyles();
+
+    // Auto-lock access immediately if a timed validity period expires mid-session
+    setInterval(() => {
+      if (typeof cloudSync !== 'undefined' && cloudSync.user && !cloudSync.isAdmin()) {
+        const plan = cloudSync.getActivePlanMeta();
+        if (plan.isExpired && !document.body.classList.contains('subscription-locked')) {
+          void cloudSync.refreshSubscriptionFromServer();
+          updateAccountAndSubscriptionUI();
+          void loadSharedStudioStyles();
+          showToast('Your studio access validity has expired.');
+        }
+      }
+    }, 60000);
+
     if (cloudSync.hasPendingCallbackHash()) {
       openClerkAuthModal('signIn');
     }
@@ -4563,7 +4955,10 @@ Looking forward to welcoming you! Thank you.`);
     }
 
     const initialHash = window.location.hash.replace('#', '');
-    if (initialHash && ['home', 'explore', 'boards', 'framing', 'saved', 'history', 'admin'].includes(initialHash)) {
+    if (['terms', 'privacy', 'contact'].includes(initialHash)) {
+      switchView('home');
+      openStudioLegalModal(initialHash);
+    } else if (initialHash && ['home', 'explore', 'boards', 'framing', 'saved', 'history', 'admin'].includes(initialHash)) {
       switchView(initialHash);
     } else {
       switchView('home');

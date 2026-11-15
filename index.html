@@ -3,6 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0B0C0E" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Yashraj AI" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <title>YASHRAJ FRAMES – AI STUDIO</title>
     <meta name="description" content="Pinterest-style AI photo-editing prompt library and visual workspace for Yashraj Frames." />
     <meta property="og:title" content="YASHRAJ FRAMES – AI STUDIO" />
@@ -311,7 +318,13 @@
           <span class="round-badge" id="badge-mobile-tools" style="display: none;">0</span>
         </button>
 
-        <!-- Admin Panel Trigger (Shown ONLY to yashrajart1999@gmail.com) -->
+        <!-- Install PWA App Button (Automatically hidden when running in standalone mode) -->
+        <button type="button" class="btn-header-install-app" id="btnHeaderInstallApp" title="Install Yashraj Frames App on your device" style="display: none;">
+          <svg style="width: 14px; height: 14px;"><use href="#icon-download"></use></svg>
+          <span data-pwa-install-label>Install App</span>
+        </button>
+
+        <!-- Admin Panel Trigger (Shown ONLY to Studio Admin) -->
         <button type="button" class="btn-header-admin" id="btnHeaderAdmin" title="Open Studio Admin Panel" style="display: none;">
           <svg style="width: 14px; height: 14px;"><use href="#icon-shield"></use></svg>
           <span>Admin</span>
@@ -661,7 +674,7 @@
         </div>
       </section>
 
-      <!-- VIEW 6: STUDIO ADMIN CONSOLE (Strictly visible to yashrajart1999@gmail.com) -->
+      <!-- VIEW 6: STUDIO ADMIN CONSOLE (Strictly visible to Studio Admin) -->
       <section class="view-section" id="view-admin">
         <div class="admin-console-shell">
           <div class="admin-top-bar">
@@ -751,11 +764,11 @@
                     <tr>
                       <th>Subscriber (Email ID)</th>
                       <th>Subscription Plan</th>
-                      <th>Access Status</th>
+                      <th>Status &amp; Validity</th>
                       <th class="num-col">Prompts Copied</th>
                       <th class="num-col">AI Redirects</th>
                       <th>Last Active</th>
-                      <th class="actions-col">Approve / Pause</th>
+                      <th class="actions-col">Validity / Approve / Pause</th>
                     </tr>
                   </thead>
                   <tbody id="adminUsersTableBody">
@@ -790,6 +803,24 @@
                     <div><span>AI Redirects</span><strong id="adminInspRedirects">0</strong></div>
                     <div><span>Styles / Orders</span><strong id="adminInspAssets">0 / 0</strong></div>
                   </div>
+                  <div class="admin-validity-editor">
+                    <div class="admin-validity-head">
+                      <label for="adminInspValiditySelect">Access Validity Period</label>
+                      <span class="admin-validity-readout" id="adminInspExpiryReadout">Not set</span>
+                    </div>
+                    <div class="admin-validity-controls">
+                      <select class="admin-select admin-insp-validity-select" id="adminInspValiditySelect">
+                        <option value="7d">7-Day Trial</option>
+                        <option value="30d" selected>30 Days (1 Month)</option>
+                        <option value="90d">90 Days (3 Months)</option>
+                        <option value="365d">1 Year</option>
+                        <option value="lifetime">Lifetime (No Expiry)</option>
+                        <option value="custom">Custom Expiry Date</option>
+                      </select>
+                      <input type="date" class="admin-validity-date-input" id="adminInspCustomDate" style="display: none;" />
+                      <button type="button" class="admin-btn-secondary" id="btnAdminApplyValidity">Set Validity</button>
+                    </div>
+                  </div>
                   <div class="admin-note-editor">
                     <label for="adminInspNoteInput">Admin Payment / Approval Note</label>
                     <textarea id="adminInspNoteInput" rows="2" placeholder="e.g. Paid ₹499 via UPI on 15 Nov, approved till Dec"></textarea>
@@ -819,6 +850,25 @@
           </div>
         </div>
       </section>
+
+      <footer class="studio-legal-footer" id="studioLegalFooter" aria-label="Studio Policies and Contact">
+        <div class="studio-legal-footer-inner">
+          <div class="studio-footer-brand">
+            <strong>Yashraj Frames &mdash; AI Studio</strong>
+            <span>Custom Portrait Prompts &amp; Virtual Framing</span>
+          </div>
+          <nav class="studio-footer-links" aria-label="Legal and Contact Links">
+            <button type="button" class="studio-footer-link-btn" data-legal-open="terms">Terms of Service</button>
+            <span class="studio-footer-sep" aria-hidden="true">&middot;</span>
+            <button type="button" class="studio-footer-link-btn" data-legal-open="privacy">Privacy Policy</button>
+            <span class="studio-footer-sep" aria-hidden="true">&middot;</span>
+            <button type="button" class="studio-footer-link-btn" data-legal-open="contact">Contact</button>
+            <span class="studio-footer-sep" aria-hidden="true">&middot;</span>
+            <a class="studio-footer-email" href="mailto:tech.yashrajframes@gmail.com">tech.yashrajframes@gmail.com</a>
+          </nav>
+        </div>
+        <div class="studio-footer-credit">Made with 💙 by <strong>YASHRAJ JADHAV</strong></div>
+      </footer>
 
     </main>
 
@@ -1307,7 +1357,7 @@
               </div>
               <div class="slip-form-group">
                 <label for="txtShopEmail">Studio Email</label>
-                <input type="email" id="txtShopEmail" class="slip-input" value="yashrajart1999@gmail.com" />
+                <input type="email" id="txtShopEmail" class="slip-input" value="tech.yashrajframes@gmail.com" />
               </div>
               <div class="slip-form-group">
                 <label for="txtShopHours">Studio Hours</label>
@@ -1647,6 +1697,28 @@
             </div>
             <span class="mobile-sheet-count" id="mobSheetRecentCount">0</span>
           </button>
+
+          <button type="button" class="mobile-sheet-action-row mobile-sheet-install-row" id="mobSheetInstallApp" style="display: none;">
+            <div class="mobile-sheet-icon icon-gold">
+              <svg style="width: 18px; height: 18px;"><use href="#icon-download"></use></svg>
+            </div>
+            <div class="mobile-sheet-row-text">
+              <span class="mobile-sheet-row-title" data-pwa-install-label>Install App</span>
+              <span class="mobile-sheet-row-sub">Add Yashraj Frames to your home screen</span>
+            </div>
+            <span class="mobile-sheet-row-meta">PWA</span>
+          </button>
+
+          <button type="button" class="mobile-sheet-action-row" id="mobSheetLegalBtn">
+            <div class="mobile-sheet-icon icon-neutral">
+              <svg style="width: 18px; height: 18px;"><use href="#icon-mail"></use></svg>
+            </div>
+            <div class="mobile-sheet-row-text">
+              <span class="mobile-sheet-row-title">Terms, Privacy &amp; Contact</span>
+              <span class="mobile-sheet-row-sub">tech.yashrajframes@gmail.com &middot; Studio policies</span>
+            </div>
+            <span class="mobile-sheet-row-meta">Info</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1725,11 +1797,11 @@
             <svg style="width: 18px; height: 18px;"><use href="#icon-lock"></use></svg>
             <div>
               <strong id="lblAccountStatusTitle">Subscription Paused</strong>
-              <p id="lblAccountStatusMsg">Your prompt visibility, copy, and AI Auto Take redirect features are currently paused by Admin. Contact yashrajart1999@gmail.com to approve/reactivate.</p>
+              <p id="lblAccountStatusMsg">Your prompt visibility, copy, and AI Auto Take redirect features are currently paused by Admin. Contact tech.yashrajframes@gmail.com to approve/reactivate.</p>
             </div>
           </div>
 
-          <div class="account-usage-grid">
+          <div class="account-usage-grid account-usage-grid-4">
             <div class="account-usage-tile">
               <span class="account-usage-label">Custom Cloud Styles</span>
               <strong class="account-usage-val" id="lblUsageStyles">0 / 25</strong>
@@ -1737,6 +1809,10 @@
             <div class="account-usage-tile">
               <span class="account-usage-label">Workshop Orders</span>
               <strong class="account-usage-val" id="lblUsageOrders">0 / 50</strong>
+            </div>
+            <div class="account-usage-tile">
+              <span class="account-usage-label">Access Validity</span>
+              <strong class="account-usage-val" id="lblUsageValidity">Pending</strong>
             </div>
             <div class="account-usage-tile">
               <span class="account-usage-label">Realtime Sync</span>
@@ -1800,6 +1876,16 @@
               <button type="button" class="plan-tier-request-btn" data-request-tier="enterprise">Request Enterprise Approval</button>
               <span class="plan-tier-state" data-tier-state="enterprise">Ready for Approval</span>
             </div>
+          </div>
+
+          <div class="account-legal-links">
+            <button type="button" class="studio-footer-link-btn" data-legal-open="terms">Terms of Service</button>
+            <span class="studio-footer-sep" aria-hidden="true">&middot;</span>
+            <button type="button" class="studio-footer-link-btn" data-legal-open="privacy">Privacy Policy</button>
+            <span class="studio-footer-sep" aria-hidden="true">&middot;</span>
+            <button type="button" class="studio-footer-link-btn" data-legal-open="contact">Contact Support</button>
+            <span class="studio-footer-sep" aria-hidden="true">&middot;</span>
+            <a class="studio-footer-email" href="mailto:tech.yashrajframes@gmail.com">tech.yashrajframes@gmail.com</a>
           </div>
         </div>
       </div>
@@ -1901,7 +1987,7 @@
             </div>
             <div class="receipt-contact-line">
               <svg style="width: 16px; height: 16px; color: var(--accent-gold);"><use href="#icon-mail"></use></svg>
-              <span id="receiptPortalShopEmail">yashrajart1999@gmail.com</span>
+              <span id="receiptPortalShopEmail">tech.yashrajframes@gmail.com</span>
             </div>
             <div class="receipt-contact-line">
               <svg style="width: 16px; height: 16px; color: var(--accent-gold);"><use href="#icon-clock"></use></svg>
@@ -1922,7 +2008,7 @@
               <svg style="width: 17px; height: 17px;"><use href="#icon-phone"></use></svg>
               <span>Call Studio</span>
             </a>
-            <a class="receipt-cta-btn receipt-cta-email" id="btnReceiptEmail" href="mailto:yashrajart1999@gmail.com">
+            <a class="receipt-cta-btn receipt-cta-email" id="btnReceiptEmail" href="mailto:tech.yashrajframes@gmail.com">
               <svg style="width: 17px; height: 17px;"><use href="#icon-mail"></use></svg>
               <span>Email Studio</span>
             </a>
@@ -1940,6 +2026,145 @@
         </div>
       </div>
     </section>
+
+    <!-- iOS SAFARI HOME SCREEN INSTALL GUIDE MODAL -->
+    <div class="pinterest-modal-backdrop" id="iosInstallGuideModal" role="dialog" aria-modal="true" aria-labelledby="iosInstallModalTitle">
+      <div class="ios-install-guide-card" style="position: relative;">
+        <button type="button" class="modal-floating-close-btn modal-card-corner-close" id="iosInstallCloseBtn" aria-label="Close iOS Install Guide">
+          <svg style="width: 18px; height: 18px;"><use href="#icon-close"></use></svg>
+        </button>
+        <div class="ios-install-header">
+          <div class="ios-install-app-badge">YF</div>
+          <div>
+            <h3 id="iosInstallModalTitle">Install on iPhone / iPad</h3>
+            <p>Add Yashraj Frames AI Studio to your home screen for full-screen app access.</p>
+          </div>
+        </div>
+        <ol class="ios-install-steps">
+          <li>Tap the <strong>Share</strong> button in the Safari toolbar at the bottom or top of your screen.</li>
+          <li>Scroll down the share sheet and tap <strong>Add to Home Screen</strong>.</li>
+          <li>Tap <strong>Add</strong> in the top-right corner to launch as a standalone studio app.</li>
+        </ol>
+        <button type="button" class="admin-btn-primary ios-install-gotit-btn" id="btnIosInstallGotIt">Got It</button>
+      </div>
+    </div>
+
+    <!-- TERMS OF SERVICE, PRIVACY POLICY & STUDIO CONTACT MODAL -->
+    <div class="pinterest-modal-backdrop" id="studioLegalModal" role="dialog" aria-modal="true" aria-labelledby="studioLegalModalTitle">
+      <div class="studio-legal-card" style="position: relative;">
+        <button type="button" class="modal-floating-close-btn modal-card-corner-close" id="studioLegalCloseBtn" aria-label="Close Studio Policies and Contact">
+          <svg style="width: 18px; height: 18px;"><use href="#icon-close"></use></svg>
+        </button>
+
+        <div class="studio-legal-header">
+          <div class="studio-legal-brand">
+            <div class="slip-brand-icon">
+              <svg style="width: 18px; height: 18px;"><use href="#icon-shield"></use></svg>
+            </div>
+            <div>
+              <h2 class="slip-brand-title" id="studioLegalModalTitle">Yashraj Frames &mdash; Policies &amp; Contact</h2>
+              <p class="slip-brand-sub">Terms of Service, Privacy Policy &amp; Official Studio Support</p>
+            </div>
+          </div>
+
+          <div class="legal-tabs-bar" role="tablist" aria-label="Legal and Contact Tabs">
+            <button type="button" class="legal-tab-btn active" role="tab" aria-selected="true" data-legal-tab="terms">Terms of Service</button>
+            <button type="button" class="legal-tab-btn" role="tab" aria-selected="false" data-legal-tab="privacy">Privacy Policy</button>
+            <button type="button" class="legal-tab-btn" role="tab" aria-selected="false" data-legal-tab="contact">Contact Studio</button>
+          </div>
+        </div>
+
+        <div class="studio-legal-body">
+          <!-- TAB 1: TERMS OF SERVICE -->
+          <div class="legal-tab-panel active" data-legal-panel="terms">
+            <div class="legal-updated-line">Effective November 2026 &middot; Yashraj Frames AI Studio</div>
+
+            <div class="legal-section-block">
+              <h3>1. Studio Membership &amp; Access Validity</h3>
+              <p>Access to full AI portrait prompt instructions, one-click copying, and AI Auto Take launches requires a signed-in Clerk account manually approved by Studio Admin. Approved accounts may carry a time-limited validity period (such as 7-Day Trial, 30 Days, 90 Days, 1 Year, or custom date) or Lifetime access. Access automatically locks when a validity period expires until renewed.</p>
+            </div>
+
+            <div class="legal-section-block">
+              <h3>2. Prompt &amp; Creative Asset License</h3>
+              <p>All curated style presets, frame previews, and prompt formulas are licensed to authorized Yashraj Frames subscribers for studio portrait production and client framing consultations. Automated scraping, bulk redistribution, or reselling raw prompt catalogs without written permission is prohibited.</p>
+            </div>
+
+            <div class="legal-section-block">
+              <h3>3. Custom Framing &amp; Workshop Orders</h3>
+              <p>Virtual Framing Studio measurements, print media previews, and pricing estimates act as client visualization proofs. Final delivery timelines, advance deposits, and balance dues generated on job slips or QR receipts are subject to workshop verification prior to printing and framing.</p>
+            </div>
+
+            <div class="legal-section-block">
+              <h3>4. Third-Party AI Platforms</h3>
+              <p>AI Auto Take opens external platforms (such as ChatGPT, Claude, Gemini, Bing Image Creator, Grok, Perplexity, or Midjourney) at your discretion. Generated artwork quality, content moderation, and uptime on those services are governed by their respective terms.</p>
+            </div>
+          </div>
+
+          <!-- TAB 2: PRIVACY POLICY -->
+          <div class="legal-tab-panel" data-legal-panel="privacy">
+            <div class="legal-updated-line">Privacy Commitment &middot; Yashraj Frames AI Studio</div>
+
+            <div class="legal-section-block">
+              <h3>1. Account &amp; Authentication Information</h3>
+              <p>When you sign in via Clerk, we store your account identifier, display name, and primary email address strictly to verify studio access, manage subscription tiers and expiry dates, and protect curated prompt libraries.</p>
+            </div>
+
+            <div class="legal-section-block">
+              <h3>2. Cloud Sync &amp; Usage Records</h3>
+              <p>Approved subscriber preferences, saved favorites, workshop orders, and prompt copy or AI redirect events are synced securely via Supabase so your studio workflow stays synchronized across desktop and mobile devices. We never sell or rent user email addresses or subscriber lists.</p>
+            </div>
+
+            <div class="legal-section-block">
+              <h3>3. Client Photos &amp; Virtual Framing</h3>
+              <p>Customer photographs loaded into the Virtual Framing Studio are rendered directly inside your browser for live wall previews and client proof downloads. When generating a digital QR receipt, only order specifications and your configured shop contact fields are encoded.</p>
+            </div>
+
+            <div class="legal-section-block">
+              <h3>4. Data Requests &amp; Account Deletion</h3>
+              <p>You may manage your profile directly through Clerk or email <a href="mailto:tech.yashrajframes@gmail.com">tech.yashrajframes@gmail.com</a> to request data export, correction, or removal of your cloud studio records.</p>
+            </div>
+          </div>
+
+          <!-- TAB 3: CONTACT STUDIO -->
+          <div class="legal-tab-panel" data-legal-panel="contact">
+            <div class="legal-updated-line">Official Support &amp; Approval Desk &middot; Yashraj Frames</div>
+
+            <div class="legal-contact-card">
+              <div class="legal-contact-row">
+                <span class="legal-contact-label">Official Support &amp; Technical Email</span>
+                <strong class="legal-contact-value">tech.yashrajframes@gmail.com</strong>
+              </div>
+              <div class="legal-contact-row">
+                <span class="legal-contact-label">Studio Support Hours</span>
+                <span class="legal-contact-text">Monday &ndash; Saturday, 10:00 AM &ndash; 8:30 PM IST</span>
+              </div>
+              <div class="legal-contact-row">
+                <span class="legal-contact-label">Approval, Renewal &amp; Custom Orders</span>
+                <span class="legal-contact-text">Include your registered Clerk sign-in email, requested plan or validity period, or your framing order number for rapid verification.</span>
+              </div>
+
+              <div class="legal-contact-actions">
+                <a class="btn-whatsapp-send btn-account-signin-gold" href="mailto:tech.yashrajframes@gmail.com?subject=Yashraj%20Frames%20AI%20Studio%20Support">
+                  <svg style="width: 16px; height: 16px;"><use href="#icon-mail"></use></svg>
+                  <span>Email tech.yashrajframes@gmail.com</span>
+                </a>
+                <button type="button" class="btn-copy-slip" id="btnLegalCopyEmail">
+                  <svg style="width: 15px; height: 15px;"><use href="#icon-copy"></use></svg>
+                  <span>Copy Email Address</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="studio-modal-dev-credit">Made with 💙 by <strong>YASHRAJ JADHAV</strong></div>
+      </div>
+    </div>
+
+    <!-- OFFLINE CONNECTIVITY INDICATOR -->
+    <div class="pwa-offline-pill" id="pwaOfflineIndicator" style="display: none;" role="status" aria-live="polite">
+      <span class="pwa-offline-dot"></span>
+      <span>Offline Mode — Cached gallery &amp; studio workspace active</span>
+    </div>
 
     <!-- PINTEREST TOAST NOTIFICATION PILL -->
     <div class="toast-container" id="toastContainer"></div>
