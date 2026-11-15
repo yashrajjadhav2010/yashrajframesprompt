@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import {defineConfig} from 'vite';
-import {handleStudioApiRequest} from './server/studioApi.ts';
+import {handleStudioApiRequest} from './server/studioApi.mjs';
 
 function studioApiPlugin() {
   return {

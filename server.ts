@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { handleStudioApiRequest } from './server/studioApi.ts';
+import { handleStudioApiRequest } from './server/studioApi.mjs';
 
 const PORT = Number(process.env.PORT) || 3000;
 const DIST_DIR = path.resolve(process.cwd(), 'dist');

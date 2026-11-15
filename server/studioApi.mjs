@@ -1,37 +1,20 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 
 export const ADMIN_EMAIL = 'yashrajart1999@gmail.com';
 
-const PLAN_LIMITS: Record<string, { styleLimit: number; orderLimit: number }> = {
+const PLAN_LIMITS = {
   free: { styleLimit: 25, orderLimit: 50 },
   studio_pro: { styleLimit: 1000, orderLimit: 5000 },
   enterprise: { styleLimit: 10000, orderLimit: 50000 }
 };
 
-interface EnvConfig {
-  clerkSecretKey: string;
-  clerkPublishableKey: string;
-  supabaseUrl: string;
-  supabaseSecretKey: string;
-}
+let cachedEnv = null;
+let cachedJwks = { fetchedAt: 0, keys: [] };
 
-interface JwkKey {
-  kid?: string;
-  kty: string;
-  n?: string;
-  e?: string;
-  use?: string;
-  alg?: string;
-}
-
-let cachedEnv: EnvConfig | null = null;
-let cachedJwks: { fetchedAt: number; keys: JwkKey[] } = { fetchedAt: 0, keys: [] };
-
-function readDotEnvFiles(): Record<string, string> {
-  const result: Record<string, string> = {};
+function readDotEnvFiles() {
+  const result = {};
   const root = process.cwd();
   for (const file of ['.env', '.env.local']) {
     const full = path.join(root, file);
@@ -48,12 +31,12 @@ function readDotEnvFiles(): Record<string, string> {
   return result;
 }
 
-function getEnvConfig(): EnvConfig {
+function getEnvConfig() {
   if (cachedEnv && cachedEnv.clerkSecretKey && cachedEnv.supabaseUrl && cachedEnv.supabaseSecretKey) {
     return cachedEnv;
   }
   const fileEnv = readDotEnvFiles();
-  const pick = (keys: string[]) => {
+  const pick = (keys) => {
     for (const k of keys) {
       const v = (process.env[k] || fileEnv[k] || '').trim();
       if (v) return v;
@@ -74,13 +57,13 @@ function getEnvConfig(): EnvConfig {
   return cachedEnv;
 }
 
-function base64UrlDecode(str: string): Buffer {
-  let b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+function base64UrlDecode(str) {
+  let b64 = String(str || '').replace(/-/g, '+').replace(/_/g, '/');
   while (b64.length % 4 !== 0) b64 += '=';
   return Buffer.from(b64, 'base64');
 }
 
-function deriveClerkFrontendDomain(publishableKey: string): string {
+function deriveClerkFrontendDomain(publishableKey) {
   const parts = String(publishableKey || '').trim().split('_');
   if (parts.length < 3) return '';
   try {
@@ -91,31 +74,52 @@ function deriveClerkFrontendDomain(publishableKey: string): string {
   }
 }
 
-async function getClerkJwks(forceRefresh = false): Promise<JwkKey[]> {
+async function getClerkJwks(forceRefresh = false, issuerUrl = '') {
   const now = Date.now();
   if (!forceRefresh && cachedJwks.keys.length > 0 && now - cachedJwks.fetchedAt < 10 * 60 * 1000) {
     return cachedJwks.keys;
   }
   const cfg = getEnvConfig();
-  let keys: JwkKey[] = [];
+  let keys = [];
 
   if (cfg.clerkSecretKey) {
-    const res = await fetch('https://api.clerk.com/v1/jwks', {
-      headers: { Authorization: `Bearer ${cfg.clerkSecretKey}` }
-    });
-    if (res.ok) {
-      const json = (await res.json()) as { keys?: JwkKey[] };
-      if (Array.isArray(json.keys)) keys = json.keys;
+    try {
+      const res = await fetch('https://api.clerk.com/v1/jwks', {
+        headers: { Authorization: `Bearer ${cfg.clerkSecretKey}` }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json.keys)) keys = json.keys;
+      }
+    } catch {
+      // fall through to issuer / domain JWKS
+    }
+  }
+
+  if (keys.length === 0 && issuerUrl && /^https:\/\/[^/]+/i.test(issuerUrl)) {
+    try {
+      const cleanIss = issuerUrl.replace(/\/+$/, '');
+      const res = await fetch(`${cleanIss}/.well-known/jwks.json`);
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json.keys)) keys = json.keys;
+      }
+    } catch {
+      // fall through
     }
   }
 
   if (keys.length === 0 && cfg.clerkPublishableKey) {
     const domain = deriveClerkFrontendDomain(cfg.clerkPublishableKey);
     if (domain) {
-      const res = await fetch(`https://${domain}/.well-known/jwks.json`);
-      if (res.ok) {
-        const json = (await res.json()) as { keys?: JwkKey[] };
-        if (Array.isArray(json.keys)) keys = json.keys;
+      try {
+        const res = await fetch(`https://${domain}/.well-known/jwks.json`);
+        if (res.ok) {
+          const json = await res.json();
+          if (Array.isArray(json.keys)) keys = json.keys;
+        }
+      } catch {
+        // ignore
       }
     }
   }
@@ -126,82 +130,73 @@ async function getClerkJwks(forceRefresh = false): Promise<JwkKey[]> {
   return keys;
 }
 
-async function verifyClerkJwt(token: string): Promise<{ sub: string } | null> {
+async function verifyClerkJwt(token) {
   const parts = String(token || '').split('.');
-  if (parts.length !== 3) return null;
+  if (parts.length !== 3) return { ok: false, reason: 'Malformed session token' };
 
-  let header: { kid?: string; alg?: string };
-  let payload: { sub?: string; exp?: number; nbf?: number };
+  let header;
+  let payload;
   try {
     header = JSON.parse(base64UrlDecode(parts[0]).toString('utf8'));
     payload = JSON.parse(base64UrlDecode(parts[1]).toString('utf8'));
   } catch {
-    return null;
+    return { ok: false, reason: 'Unable to decode session token' };
   }
 
-  if (!payload?.sub) return null;
+  if (!payload?.sub) return { ok: false, reason: 'Session token missing subject' };
   const nowSec = Math.floor(Date.now() / 1000);
-  if (typeof payload.exp === 'number' && payload.exp < nowSec - 15) return null;
-  if (typeof payload.nbf === 'number' && payload.nbf > nowSec + 15) return null;
+  if (typeof payload.exp === 'number' && payload.exp < nowSec - 60) {
+    return { ok: false, reason: 'Session token expired — please sign in again' };
+  }
+  if (typeof payload.nbf === 'number' && payload.nbf > nowSec + 60) {
+    return { ok: false, reason: 'Session token not active yet' };
+  }
 
-  let keys = await getClerkJwks(false);
+  const issuerUrl = typeof payload.iss === 'string' ? payload.iss : '';
+  let keys = await getClerkJwks(false, issuerUrl);
   let jwk = keys.find(k => !header.kid || k.kid === header.kid);
   if (!jwk) {
-    keys = await getClerkJwks(true);
+    keys = await getClerkJwks(true, issuerUrl);
     jwk = keys.find(k => !header.kid || k.kid === header.kid);
   }
-  if (!jwk) return null;
+  if (!jwk) return { ok: false, reason: 'Unable to fetch Clerk JWKS verification keys' };
 
   try {
-    const publicKey = crypto.createPublicKey({ key: jwk as unknown as crypto.JsonWebKey, format: 'jwk' });
+    const publicKey = crypto.createPublicKey({ key: jwk, format: 'jwk' });
     const signingInput = Buffer.from(`${parts[0]}.${parts[1]}`);
     const signature = base64UrlDecode(parts[2]);
     const valid = crypto.verify('RSA-SHA256', signingInput, publicKey, signature);
-    if (!valid) return null;
-    return { sub: String(payload.sub) };
+    if (!valid) return { ok: false, reason: 'Invalid session token signature' };
+    return { ok: true, sub: String(payload.sub) };
   } catch {
-    return null;
+    return { ok: false, reason: 'JWT signature verification error' };
   }
 }
 
-interface ClerkUserRecord {
-  id: string;
-  first_name?: string | null;
-  last_name?: string | null;
-  username?: string | null;
-  image_url?: string | null;
-  primary_email_address_id?: string | null;
-  email_addresses?: Array<{ id: string; email_address: string }>;
-  public_metadata?: Record<string, unknown>;
-  created_at?: number;
-  last_active_at?: number | null;
-  last_sign_in_at?: number | null;
-}
-
-function getClerkPrimaryEmail(user: ClerkUserRecord): string {
-  const list = Array.isArray(user.email_addresses) ? user.email_addresses : [];
+function getClerkPrimaryEmail(user) {
+  const list = Array.isArray(user?.email_addresses) ? user.email_addresses : [];
   const primary = list.find(e => e.id === user.primary_email_address_id) || list[0];
   return (primary?.email_address || '').trim();
 }
 
-function isClerkRecordAdmin(user: ClerkUserRecord): boolean {
+function isClerkRecordAdmin(user) {
   const target = ADMIN_EMAIL.toLowerCase();
-  const list = Array.isArray(user.email_addresses) ? user.email_addresses : [];
-  return list.some(e => typeof e.email_address === 'string' && e.email_address.trim().toLowerCase() === target);
+  const list = Array.isArray(user?.email_addresses) ? user.email_addresses : [];
+  return list.some(e => typeof e?.email_address === 'string' && e.email_address.trim().toLowerCase() === target);
 }
 
-function getClerkDisplayName(user: ClerkUserRecord): string {
-  const full = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+function getClerkDisplayName(user) {
+  const full = [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim();
   if (full) return full;
-  if (user.username) return user.username;
+  if (user?.username) return user.username;
   const email = getClerkPrimaryEmail(user);
   return email ? email.split('@')[0] : 'Studio Member';
 }
 
-async function clerkRequest<T = unknown>(endpoint: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: T }> {
+async function clerkRequest(endpoint, init = {}) {
   const cfg = getEnvConfig();
   if (!cfg.clerkSecretKey) {
-    return { ok: false, status: 500, data: { error: 'CLERK_SECRET_KEY not configured' } as unknown as T };
+    return { ok: false, status: 500, data: { error: 'CLERK_SECRET_KEY is not configured on the server' } };
   }
   const res = await fetch(`https://api.clerk.com/v1${endpoint}`, {
     ...init,
@@ -212,24 +207,21 @@ async function clerkRequest<T = unknown>(endpoint: string, init: RequestInit = {
     }
   });
   const text = await res.text();
-  let data: unknown = {};
+  let data = {};
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
     data = { raw: text };
   }
-  return { ok: res.ok, status: res.status, data: data as T };
+  return { ok: res.ok, status: res.status, data };
 }
 
-async function supaRest<T = unknown>(
-  tablePath: string,
-  options: { method?: string; body?: unknown; prefer?: string } = {}
-): Promise<{ ok: boolean; status: number; data: T | null; error?: string }> {
+async function supaRest(tablePath, options = {}) {
   const cfg = getEnvConfig();
   if (!cfg.supabaseUrl || !cfg.supabaseSecretKey) {
-    return { ok: false, status: 500, data: null, error: 'Supabase not configured' };
+    return { ok: false, status: 500, data: null, error: 'SUPABASE_SECRET_KEY or VITE_SUPABASE_URL not configured on server' };
   }
-  const headers: Record<string, string> = {
+  const headers = {
     apikey: cfg.supabaseSecretKey,
     Authorization: `Bearer ${cfg.supabaseSecretKey}`,
     'Content-Type': 'application/json'
@@ -243,7 +235,7 @@ async function supaRest<T = unknown>(
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined
   });
   const text = await res.text();
-  let parsed: unknown = null;
+  let parsed = null;
   try {
     parsed = text ? JSON.parse(text) : null;
   } catch {
@@ -251,24 +243,20 @@ async function supaRest<T = unknown>(
   }
   if (!res.ok) {
     const errMsg = (parsed && typeof parsed === 'object' && 'message' in parsed)
-      ? String((parsed as { message: unknown }).message)
+      ? String(parsed.message)
       : `HTTP ${res.status}`;
     return { ok: false, status: res.status, data: null, error: errMsg };
   }
-  return { ok: true, status: res.status, data: parsed as T };
+  return { ok: true, status: res.status, data: parsed };
 }
 
-function mapStatusForLegacySupabaseConstraint(status: string): string {
+function mapStatusForLegacySupabaseConstraint(status) {
   if (status === 'paused') return 'canceled';
   if (status === 'pending') return 'trialing';
   return status;
 }
 
-function mapSupabaseStatusBack(
-  supaStatus: string | undefined,
-  metaStatus: unknown,
-  isAdmin = false
-): string {
+function mapSupabaseStatusBack(supaStatus, metaStatus, isAdmin = false) {
   if (isAdmin) return 'active';
   if (typeof metaStatus === 'string' && ['active', 'paused', 'pending'].includes(metaStatus)) {
     return metaStatus;
@@ -277,29 +265,11 @@ function mapSupabaseStatusBack(
   if (metaStatus === 'canceled' || metaStatus === 'past_due') return 'paused';
   if (supaStatus === 'canceled' || supaStatus === 'past_due') return 'paused';
   if (supaStatus === 'trialing' || supaStatus === 'pending') return 'pending';
-  // Manual approval policy: accounts remain pending until Admin explicitly approves them
   return 'pending';
 }
 
-interface PromptLogEntry {
-  id: string;
-  user_id: string;
-  email: string;
-  pin_id: number | null;
-  pin_title: string;
-  category: string;
-  action_type: 'copy' | 'ai_redirect';
-  ai_target: string | null;
-  created_at: string;
-}
-
-function buildMergedSubscriber(
-  clerkUser: ClerkUserRecord,
-  supaRow?: Record<string, unknown> | null,
-  styleCount = 0,
-  orderCount = 0
-) {
-  const meta = (clerkUser.public_metadata && typeof clerkUser.public_metadata === 'object')
+function buildMergedSubscriber(clerkUser, supaRow = null, styleCount = 0, orderCount = 0) {
+  const meta = (clerkUser?.public_metadata && typeof clerkUser.public_metadata === 'object')
     ? clerkUser.public_metadata
     : {};
   const email = getClerkPrimaryEmail(clerkUser) || (typeof supaRow?.email === 'string' ? supaRow.email : '');
@@ -327,9 +297,9 @@ function buildMergedSubscriber(
   const lastActiveMs = Math.max(
     meta.lastActiveAt ? Date.parse(String(meta.lastActiveAt)) || 0 : 0,
     supaRow?.last_active_at ? Date.parse(String(supaRow.last_active_at)) || 0 : 0,
-    Number(clerkUser.last_active_at) || 0,
-    Number(clerkUser.last_sign_in_at) || 0,
-    Number(clerkUser.created_at) || 0
+    Number(clerkUser?.last_active_at) || 0,
+    Number(clerkUser?.last_sign_in_at) || 0,
+    Number(clerkUser?.created_at) || 0
   );
 
   return {
@@ -354,17 +324,8 @@ function buildMergedSubscriber(
   };
 }
 
-async function syncUserSubscriptionRowToSupabase(
-  userId: string,
-  payload: {
-    email?: string;
-    plan_tier?: string;
-    plan_status?: string;
-    style_limit?: number;
-    order_limit?: number;
-  }
-) {
-  const row: Record<string, unknown> = {
+async function syncUserSubscriptionRowToSupabase(userId, payload) {
+  const row = {
     user_id: userId,
     updated_at: new Date().toISOString()
   };
@@ -381,7 +342,6 @@ async function syncUserSubscriptionRowToSupabase(
   });
   if (firstAttempt.ok) return firstAttempt;
 
-  // Fallback when old check constraint rejects 'paused' / 'pending' — still triggers Realtime wake-up!
   if (payload.plan_status && (payload.plan_status === 'paused' || payload.plan_status === 'pending')) {
     const legacyRow = {
       ...row,
@@ -396,10 +356,24 @@ async function syncUserSubscriptionRowToSupabase(
   return firstAttempt;
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readJsonBody(req) {
+  const preParsed = req?.body;
+  if (preParsed && typeof preParsed === 'object' && !Buffer.isBuffer(preParsed)) {
+    return preParsed;
+  }
+  if (typeof preParsed === 'string') {
+    try {
+      return preParsed.trim() ? JSON.parse(preParsed) : {};
+    } catch {
+      return {};
+    }
+  }
+  if (req?.readableEnded) {
+    return {};
+  }
   return new Promise((resolve) => {
-    const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
     req.on('end', () => {
       try {
         const raw = Buffer.concat(chunks).toString('utf8').trim();
@@ -412,31 +386,42 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
   });
 }
 
-function sendJson(res: ServerResponse, statusCode: number, data: unknown) {
+function sendJson(res, statusCode, data) {
   res.statusCode = statusCode;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
   res.end(JSON.stringify(data));
 }
 
-async function authenticateRequest(req: IncomingMessage): Promise<{ user: ClerkUserRecord; isAdmin: boolean } | null> {
+async function authenticateRequest(req) {
   const authHeader = String(req.headers.authorization || '');
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  if (!token) return null;
+  if (!token) {
+    return { ok: false, status: 401, error: 'Authentication required' };
+  }
 
   const verified = await verifyClerkJwt(token);
-  if (!verified?.sub) return null;
+  if (!verified.ok) {
+    return { ok: false, status: 401, error: verified.reason || 'Invalid Clerk session token' };
+  }
 
-  const clerkRes = await clerkRequest<ClerkUserRecord>(`/users/${encodeURIComponent(verified.sub)}`);
-  if (!clerkRes.ok || !clerkRes.data?.id) return null;
+  const clerkRes = await clerkRequest(`/users/${encodeURIComponent(verified.sub)}`);
+  if (!clerkRes.ok || !clerkRes.data?.id) {
+    return {
+      ok: false,
+      status: clerkRes.status >= 400 ? clerkRes.status : 500,
+      error: clerkRes.data?.error || clerkRes.data?.errors?.[0]?.message || 'Unable to verify user with Clerk API (check CLERK_SECRET_KEY)'
+    };
+  }
 
   return {
+    ok: true,
     user: clerkRes.data,
     isAdmin: isClerkRecordAdmin(clerkRes.data)
   };
 }
 
-export async function handleStudioApiRequest(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+export async function handleStudioApiRequest(req, res) {
   const rawUrl = req.url || '/';
   const pathname = rawUrl.split('?')[0];
   if (!pathname.startsWith('/api/')) return false;
@@ -448,14 +433,16 @@ export async function handleStudioApiRequest(req: IncomingMessage, res: ServerRe
     sendJson(res, 200, {
       ok: true,
       clerkReady: Boolean(cfg.clerkSecretKey),
-      supabaseReady: Boolean(cfg.supabaseUrl && cfg.supabaseSecretKey)
+      clerkPublishableReady: Boolean(cfg.clerkPublishableKey),
+      supabaseReady: Boolean(cfg.supabaseUrl && cfg.supabaseSecretKey),
+      platform: process.env.VERCEL ? 'vercel' : 'node'
     });
     return true;
   }
 
   const auth = await authenticateRequest(req);
-  if (!auth) {
-    sendJson(res, 401, { ok: false, error: 'Authentication required' });
+  if (!auth.ok) {
+    sendJson(res, auth.status, { ok: false, error: auth.error });
     return true;
   }
 
@@ -465,7 +452,7 @@ export async function handleStudioApiRequest(req: IncomingMessage, res: ServerRe
     const currentMeta = (auth.user.public_metadata && typeof auth.user.public_metadata === 'object')
       ? { ...auth.user.public_metadata }
       : {};
-    const subRes = await supaRest<Array<Record<string, unknown>>>(
+    const subRes = await supaRest(
       `user_subscriptions?user_id=eq.${encodeURIComponent(auth.user.id)}&select=*`
     );
     let supaRow = Array.isArray(subRes.data) && subRes.data[0] ? subRes.data[0] : null;
@@ -479,7 +466,7 @@ export async function handleStudioApiRequest(req: IncomingMessage, res: ServerRe
         planStatus: 'pending',
         lastActiveAt: new Date().toISOString()
       };
-      const clerkPatch = await clerkRequest<ClerkUserRecord>(
+      const clerkPatch = await clerkRequest(
         `/users/${encodeURIComponent(auth.user.id)}/metadata`,
         { method: 'PATCH', body: JSON.stringify({ public_metadata: nextMeta }) }
       );
@@ -497,7 +484,7 @@ export async function handleStudioApiRequest(req: IncomingMessage, res: ServerRe
         order_limit: PLAN_LIMITS.free.orderLimit
       });
       if (Array.isArray(created.data) && created.data[0]) {
-        supaRow = created.data[0] as Record<string, unknown>;
+        supaRow = created.data[0];
       }
     }
 
@@ -534,7 +521,7 @@ export async function handleStudioApiRequest(req: IncomingMessage, res: ServerRe
       lastActiveAt: new Date().toISOString()
     };
 
-    const clerkPatch = await clerkRequest<ClerkUserRecord>(
+    const clerkPatch = await clerkRequest(
       `/users/${encodeURIComponent(auth.user.id)}/metadata`,
       { method: 'PATCH', body: JSON.stringify({ public_metadata: nextMeta }) }
     );
@@ -579,8 +566,8 @@ export async function handleStudioApiRequest(req: IncomingMessage, res: ServerRe
     const currentMeta = (auth.user.public_metadata && typeof auth.user.public_metadata === 'object')
       ? auth.user.public_metadata
       : {};
-    const prevLogs = Array.isArray(currentMeta.recentPromptLogs) ? (currentMeta.recentPromptLogs as PromptLogEntry[]) : [];
-    const newLog: PromptLogEntry = {
+    const prevLogs = Array.isArray(currentMeta.recentPromptLogs) ? currentMeta.recentPromptLogs : [];
+    const newLog = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       user_id: auth.user.id,
       email: getClerkPrimaryEmail(auth.user),
@@ -628,32 +615,35 @@ export async function handleStudioApiRequest(req: IncomingMessage, res: ServerRe
     }
 
     const [clerkUsersRes, subsRes, stylesRes, ordersRes] = await Promise.all([
-      clerkRequest<ClerkUserRecord[]>('/users?limit=100&order_by=-last_active_at'),
-      supaRest<Array<Record<string, unknown>>>('user_subscriptions?select=*'),
-      supaRest<Array<{ id: number; user_id: string }>>('studio_styles?select=id,user_id'),
-      supaRest<Array<{ order_num: string; user_id: string }>>('shop_orders?select=order_num,user_id')
+      clerkRequest('/users?limit=100&order_by=-last_active_at'),
+      supaRest('user_subscriptions?select=*'),
+      supaRest('studio_styles?select=id,user_id'),
+      supaRest('shop_orders?select=order_num,user_id')
     ]);
 
     if (!clerkUsersRes.ok || !Array.isArray(clerkUsersRes.data)) {
-      sendJson(res, 500, { ok: false, error: 'Unable to fetch Clerk users directory' });
+      sendJson(res, 500, {
+        ok: false,
+        error: clerkUsersRes.data?.error || 'Unable to fetch Clerk users directory (check CLERK_SECRET_KEY)'
+      });
       return true;
     }
 
-    const subMap = new Map<string, Record<string, unknown>>();
+    const subMap = new Map();
     if (Array.isArray(subsRes.data)) {
       for (const r of subsRes.data) {
         if (typeof r.user_id === 'string') subMap.set(r.user_id, r);
       }
     }
 
-    const styleCounts: Record<string, number> = {};
+    const styleCounts = {};
     if (Array.isArray(stylesRes.data)) {
       for (const s of stylesRes.data) {
         styleCounts[s.user_id] = (styleCounts[s.user_id] || 0) + 1;
       }
     }
 
-    const orderCounts: Record<string, number> = {};
+    const orderCounts = {};
     if (Array.isArray(ordersRes.data)) {
       for (const o of ordersRes.data) {
         orderCounts[o.user_id] = (orderCounts[o.user_id] || 0) + 1;
@@ -669,16 +659,16 @@ export async function handleStudioApiRequest(req: IncomingMessage, res: ServerRe
       )
     );
 
-    const allLogs: PromptLogEntry[] = [];
+    const allLogs = [];
     for (const cu of clerkUsersRes.data) {
       const metaLogs = cu.public_metadata?.recentPromptLogs;
       if (Array.isArray(metaLogs)) {
         for (const item of metaLogs) {
           if (item && typeof item === 'object') {
             allLogs.push({
-              ...(item as PromptLogEntry),
+              ...item,
               user_id: cu.id,
-              email: (item as PromptLogEntry).email || getClerkPrimaryEmail(cu)
+              email: item.email || getClerkPrimaryEmail(cu)
             });
           }
         }
@@ -708,7 +698,7 @@ export async function handleStudioApiRequest(req: IncomingMessage, res: ServerRe
       return true;
     }
 
-    const targetRes = await clerkRequest<ClerkUserRecord>(`/users/${encodeURIComponent(targetUserId)}`);
+    const targetRes = await clerkRequest(`/users/${encodeURIComponent(targetUserId)}`);
     if (!targetRes.ok || !targetRes.data?.id) {
       sendJson(res, 404, { ok: false, error: 'Subscriber not found in Clerk' });
       return true;
@@ -737,7 +727,7 @@ export async function handleStudioApiRequest(req: IncomingMessage, res: ServerRe
     }
 
     const nowIso = new Date().toISOString();
-    const nextMeta: Record<string, unknown> = {
+    const nextMeta = {
       ...prevMeta,
       planTier: nextTier,
       planStatus: nextStatus,
@@ -755,7 +745,7 @@ export async function handleStudioApiRequest(req: IncomingMessage, res: ServerRe
       nextMeta.adminNote = body.admin_note.trim();
     }
 
-    const clerkPatch = await clerkRequest<ClerkUserRecord>(
+    const clerkPatch = await clerkRequest(
       `/users/${encodeURIComponent(targetUserId)}/metadata`,
       {
         method: 'PATCH',

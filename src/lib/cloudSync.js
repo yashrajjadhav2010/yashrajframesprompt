@@ -274,9 +274,19 @@ export class StudioCloudSync {
   }
 
   async getSessionJwt() {
-    if (!this.clerk || !this.clerk.session) return null;
+    if (this.initPromise) {
+      try {
+        await this.initPromise;
+      } catch {
+        // ignore init failure
+      }
+    }
+    const session = this.clerk?.session || this.clerk?.client?.activeSessions?.[0] || null;
+    if (!session || typeof session.getToken !== 'function') return null;
     try {
-      return await this.clerk.session.getToken();
+      const token = await session.getToken();
+      if (token) return token;
+      return await session.getToken({ skipCache: true });
     } catch {
       return null;
     }
@@ -285,7 +295,7 @@ export class StudioCloudSync {
   async apiFetch(endpoint, options = {}) {
     const token = await this.getSessionJwt();
     if (!token) {
-      return { ok: false, status: 401, data: { error: 'Not signed in' } };
+      return { ok: false, status: 401, data: { error: 'Session token unavailable — please sign out and sign in again' } };
     }
     try {
       const res = await fetch(endpoint, {
@@ -297,7 +307,19 @@ export class StudioCloudSync {
         },
         body: options.body !== undefined ? JSON.stringify(options.body) : undefined
       });
-      const data = await res.json().catch(() => ({}));
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        const snippet = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+        data = {
+          error: `HTTP ${res.status} (${endpoint}): Non-JSON response${snippet ? ` — ${snippet}` : ''}`
+        };
+      }
+      if (!res.ok && !data.error) {
+        data.error = `HTTP ${res.status} (${endpoint})`;
+      }
       return { ok: res.ok, status: res.status, data };
     } catch (err) {
       return { ok: false, status: 0, data: { error: err?.message || 'Network error' } };
@@ -558,10 +580,12 @@ export class StudioCloudSync {
       return;
     }
 
-    if (this.supabase && this.lastSyncedUserId !== this.user.id) {
+    if (this.lastSyncedUserId !== this.user.id) {
       this.lastSyncedUserId = this.user.id;
       await this.bootstrapCloudState();
-      await this.subscribeRealtime();
+      if (this.supabase) {
+        await this.subscribeRealtime();
+      }
     }
   }
 
@@ -913,9 +937,26 @@ export class StudioCloudSync {
     if (!this.isAdmin()) return { ok: false, error: `Admin access restricted to ${ADMIN_EMAIL}` };
     const res = await this.apiFetch('/api/admin/dashboard');
     if (!res.ok) {
+      let detail = res.data?.error || `Failed to load admin console (HTTP ${res.status || 0})`;
+      try {
+        const healthRes = await fetch('/api/health');
+        if (healthRes.ok) {
+          const health = await healthRes.json();
+          if (!health.clerkReady) {
+            detail = 'Server missing CLERK_SECRET_KEY in deployed Environment Variables.';
+          } else if (!health.supabaseReady) {
+            detail = 'Server missing SUPABASE_SECRET_KEY or VITE_SUPABASE_URL in deployed Environment Variables.';
+          }
+        } else {
+          detail = `${detail} (API health returned HTTP ${healthRes.status})`;
+        }
+      } catch {
+        // ignore secondary health error
+      }
       return {
         ok: false,
-        error: res.data?.error || 'Failed to load admin console'
+        status: res.status,
+        error: detail
       };
     }
     return {

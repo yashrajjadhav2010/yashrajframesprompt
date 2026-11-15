@@ -144,6 +144,7 @@ import { ADMIN_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUs
       searchQuery: '',
       needsSqlMigration: false,
       onlySelfVisible: false,
+      error: null,
       loading: false,
       realtimeSubscribed: false
     }
@@ -3125,7 +3126,9 @@ Looking forward to welcoming you! Thank you.`);
 
     if (dom.adminUsersTableBody) {
       if (state.admin.loading && users.length === 0) {
-        dom.adminUsersTableBody.innerHTML = '<tr><td colspan="7" class="admin-table-empty">Loading studio subscribers from Supabase...</td></tr>';
+        dom.adminUsersTableBody.innerHTML = '<tr><td colspan="7" class="admin-table-empty">Loading studio subscribers from Clerk &amp; Supabase...</td></tr>';
+      } else if (state.admin.error && users.length === 0) {
+        dom.adminUsersTableBody.innerHTML = `<tr><td colspan="7" class="admin-table-empty" style="color: #FCA5A5;">Unable to load Admin Console: ${escapeHtml(state.admin.error)}</td></tr>`;
       } else if (filteredUsers.length === 0) {
         dom.adminUsersTableBody.innerHTML = '<tr><td colspan="7" class="admin-table-empty">No subscribers match the current filter.</td></tr>';
       } else {
@@ -3273,12 +3276,16 @@ Looking forward to welcoming you! Thank you.`);
     state.admin.loading = false;
 
     if (!res.ok) {
+      state.admin.error = res.error || 'Could not load admin dashboard';
       state.admin.needsSqlMigration = Boolean(res.needsSqlMigration);
-      if (!silent) showToast(res.error || 'Could not load admin dashboard');
+      if (!silent || state.currentView === 'admin') {
+        showToast(state.admin.error);
+      }
       renderAdminDashboard();
       return;
     }
 
+    state.admin.error = null;
     state.admin.users = res.users || [];
     state.admin.logs = res.logs || [];
     state.admin.needsSqlMigration = Boolean(res.needsSqlMigration);
