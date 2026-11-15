@@ -3,8 +3,8 @@
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
   "functions": {
-    "api/**/*.mjs": {
-      "includeFiles": "server/**"
+    "api/index.mjs": {
+      "includeFiles": "server/studioApi.mjs"
     }
   },
   "rewrites": [
