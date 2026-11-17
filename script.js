@@ -148,6 +148,13 @@ import { initPwaSupport } from './src/lib/pwa.js';
       error: null,
       loading: false,
       realtimeSubscribed: false
+    },
+    cloudStyles: {
+      offset: 0,
+      hasMore: true,
+      loading: false,
+      queryKey: 'All||',
+      page0Cache: new Map()
     }
   };
 
@@ -288,11 +295,21 @@ import { initPwaSupport } from './src/lib/pwa.js';
     btnResetDefaultAiApp: document.getElementById('btnResetDefaultAiApp'),
     btnTargetNativeShare: document.getElementById('btnTargetNativeShare'),
 
-    // Masonry Grids
+    // Masonry Grids & Scroll Sentinels
     homePinsMasonry: document.getElementById('homePinsMasonry'),
+    homeScrollSkeletonGrid: document.getElementById('homeScrollSkeletonGrid'),
+    homeFeedSentinel: document.getElementById('homeFeedSentinel'),
+    btnHomeLoadMore: document.getElementById('btnHomeLoadMore'),
+    lblHomeSentinelStatus: document.getElementById('lblHomeSentinelStatus'),
     boardsGridContainer: document.getElementById('boardsGridContainer'),
     savedPinsMasonry: document.getElementById('savedPinsMasonry'),
+    savedFeedSentinel: document.getElementById('savedFeedSentinel'),
+    btnSavedLoadMore: document.getElementById('btnSavedLoadMore'),
+    lblSavedSentinelStatus: document.getElementById('lblSavedSentinelStatus'),
     historyPinsMasonry: document.getElementById('historyPinsMasonry'),
+    historyFeedSentinel: document.getElementById('historyFeedSentinel'),
+    btnHistoryLoadMore: document.getElementById('btnHistoryLoadMore'),
+    lblHistorySentinelStatus: document.getElementById('lblHistorySentinelStatus'),
 
     // Saved Sub-Tabs
     tabSavedPins: document.getElementById('tabSavedPins'),
@@ -1158,26 +1175,133 @@ import { initPwaSupport } from './src/lib/pwa.js';
   // ==========================================================================
   // CLERK AUTHENTICATION & SUPABASE REALTIME SYNC
   // ==========================================================================
-  async function loadSharedStudioStyles() {
-    const res = await cloudSync.fetchSharedStyles();
-    if (!res.ok || !Array.isArray(res.styles)) return;
-    if (isAdminUser()) {
-      const remoteMap = new Map(res.styles.map(s => [Number(s.id), s]));
-      const localOnly = state.customStyles.filter(s => !remoteMap.has(Number(s.id)));
-      state.customStyles = [...res.styles, ...localOnly].sort(
-        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
-      );
-      saveCustomStyles();
+  const STYLE_PAGE_SIZE = 12;
+
+  function mergeStylesById(existingList, incomingList, { replaceRemote = false } = {}) {
+    const byId = new Map();
+    const order = [];
+    const addOrUpdate = (item) => {
+      if (!item || item.id === undefined || item.id === null) return;
+      const key = Number(item.id);
+      if (!byId.has(key)) {
+        order.push(key);
+      }
+      const prev = byId.get(key) || {};
+      const img = item.referenceImage || item.image || item.thumbnail || prev.referenceImage || 'assets/prompts/01.jpeg';
+      byId.set(key, {
+        ...prev,
+        ...item,
+        id: key,
+        referenceImage: img,
+        thumbnail: item.thumbnail || img,
+        image: item.image || img
+      });
+    };
+
+    if (replaceRemote) {
+      incomingList.forEach(addOrUpdate);
+      if (isAdminUser()) {
+        existingList.forEach(item => {
+          if (!byId.has(Number(item.id))) addOrUpdate(item);
+        });
+      }
     } else {
-      state.customStyles = res.styles;
-      saveCustomStyles();
+      existingList.forEach(addOrUpdate);
+      incomingList.forEach(addOrUpdate);
     }
-    refreshCurrentView();
-    if (state.activeModalPin) {
-      const refreshedPin = getAllPrompts().find(p => Number(p.id) === Number(state.activeModalPin.id));
-      if (refreshedPin) {
-        state.activeModalPin = refreshedPin;
-        applyModalPromptAccessUI(refreshedPin);
+
+    return order
+      .map(id => byId.get(id))
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }
+
+  function getActiveCloudQueryParams() {
+    const cat = state.selectedCategory && state.selectedCategory !== 'All' ? state.selectedCategory : '';
+    const q = state.searchQuery ? state.searchQuery.trim() : '';
+    return {
+      category: cat,
+      q,
+      queryKey: `${cat || 'All'}||${q.toLowerCase()}`
+    };
+  }
+
+  async function loadSharedStudioStyles({ reset = true, append = false } = {}) {
+    if (state.cloudStyles.loading && append) return { ok: false, added: 0 };
+
+    const { category, q, queryKey } = getActiveCloudQueryParams();
+    const offset = append ? state.cloudStyles.offset : 0;
+    const isUnlockedNow = isPromptAccessAllowed();
+    const cacheKey = `${queryKey}::${isUnlockedNow ? '1' : '0'}`;
+
+    if (reset && !append) {
+      const cached = state.cloudStyles.page0Cache.get(cacheKey);
+      if (cached && (Date.now() - cached.fetchedAt) < 60000) {
+        state.customStyles = mergeStylesById(state.customStyles, cached.styles, { replaceRemote: queryKey === 'All||' });
+        state.cloudStyles.offset = cached.nextOffset;
+        state.cloudStyles.hasMore = cached.hasMore;
+        state.cloudStyles.queryKey = queryKey;
+        if (!append) refreshCurrentView();
+        return { ok: true, added: cached.styles.length, fromCache: true };
+      }
+    }
+
+    state.cloudStyles.loading = true;
+    updateFeedSentinelUI('home');
+    if (reset && !append && state.currentView === 'home' && getFilteredPins().length === 0) {
+      refreshCurrentView();
+    }
+
+    try {
+      const res = await cloudSync.fetchSharedStyles({
+        limit: STYLE_PAGE_SIZE,
+        offset,
+        category,
+        q
+      });
+      if (!res.ok || !Array.isArray(res.styles)) {
+        if (append) state.cloudStyles.hasMore = false;
+        return { ok: false, added: 0 };
+      }
+
+      if (reset && !append && queryKey === 'All||') {
+        state.customStyles = mergeStylesById(state.customStyles, res.styles, { replaceRemote: true });
+        saveCustomStyles();
+      } else {
+        state.customStyles = mergeStylesById(state.customStyles, res.styles, { replaceRemote: false });
+      }
+
+      state.cloudStyles.queryKey = queryKey;
+      state.cloudStyles.offset = res.nextOffset;
+      state.cloudStyles.hasMore = Boolean(res.hasMore);
+
+      if (offset === 0) {
+        state.cloudStyles.page0Cache.set(cacheKey, {
+          fetchedAt: Date.now(),
+          styles: res.styles,
+          nextOffset: res.nextOffset,
+          hasMore: Boolean(res.hasMore)
+        });
+      }
+
+      if (!append) {
+        refreshCurrentView();
+      }
+
+      if (state.activeModalPin) {
+        const refreshedPin = getAllPrompts().find(p => Number(p.id) === Number(state.activeModalPin.id));
+        if (refreshedPin) {
+          state.activeModalPin = refreshedPin;
+          applyModalPromptAccessUI(refreshedPin);
+        }
+      }
+
+      return { ok: true, added: res.styles.length, hasMore: Boolean(res.hasMore) };
+    } finally {
+      state.cloudStyles.loading = false;
+      setScrollSkeletonVisible('home', false);
+      updateFeedSentinelUI('home');
+      if (!append && state.currentView === 'home' && dom.homePinsMasonry?.querySelector('.pin-skeleton-card')) {
+        refreshCurrentView();
       }
     }
   }
@@ -1186,32 +1310,43 @@ import { initPwaSupport } from './src/lib/pwa.js';
     onAuthChange: ({ user }) => {
       updateAccountAndSubscriptionUI();
       if (!user) {
-        void loadSharedStudioStyles();
+        state.cloudStyles.page0Cache.clear();
+        void loadSharedStudioStyles({ reset: true });
       }
     },
     onAccessUnlocked: () => {
-      void loadSharedStudioStyles();
+      state.cloudStyles.page0Cache.clear();
+      void loadSharedStudioStyles({ reset: true });
     },
     onAuthSuccess: () => {
       closeClerkAuthModal();
       showToast('Signed in & syncing with studio cloud');
     },
-    onCloudBootstrap: async ({ styles, orders, preferences }) => {
-      // Shared Admin-published studio styles (Admin pushes local-only offline additions; non-admins view shared catalog)
-      if (isAdminUser()) {
-        const remoteStyleMap = new Map((styles || []).map(s => [Number(s.id), s]));
-        const localOnlyStyles = state.customStyles.filter(s => !remoteStyleMap.has(Number(s.id)));
-        const mergedStyles = [...(styles || []), ...localOnlyStyles].sort(
-          (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
-        );
-        state.customStyles = mergedStyles;
-        saveCustomStyles();
-        if (localOnlyStyles.length > 0) {
-          await cloudSync.upsertStylesBatch(localOnlyStyles);
+    onCloudBootstrap: async ({ styles, stylesPageMeta, orders, preferences }) => {
+      // Shared Admin-published studio styles (page 0 fetched on boot; additional pages load on scroll)
+      if (Array.isArray(styles)) {
+        if (isAdminUser()) {
+          const remoteStyleMap = new Map(styles.map(s => [Number(s.id), s]));
+          const localOnlyStyles = state.customStyles.filter(s => !remoteStyleMap.has(Number(s.id)));
+          state.customStyles = mergeStylesById(state.customStyles, styles, { replaceRemote: true });
+          saveCustomStyles();
+          if (localOnlyStyles.length > 0 && stylesPageMeta && !stylesPageMeta.hasMore) {
+            await cloudSync.upsertStylesBatch(localOnlyStyles);
+          }
+        } else {
+          state.customStyles = mergeStylesById(state.customStyles, styles, { replaceRemote: true });
+          saveCustomStyles();
         }
-      } else if (Array.isArray(styles)) {
-        state.customStyles = styles;
-        saveCustomStyles();
+        if (stylesPageMeta) {
+          state.cloudStyles.offset = stylesPageMeta.nextOffset;
+          state.cloudStyles.hasMore = Boolean(stylesPageMeta.hasMore);
+          state.cloudStyles.page0Cache.set(`All||::${stylesPageMeta.promptUnlocked ? '1' : '0'}`, {
+            fetchedAt: Date.now(),
+            styles,
+            nextOffset: stylesPageMeta.nextOffset,
+            hasMore: Boolean(stylesPageMeta.hasMore)
+          });
+        }
       }
 
       // Merge cloud orders + push local-only orders
@@ -2918,23 +3053,156 @@ Looking forward to welcoming you! Thank you.`);
   }
 
   // ==========================================================================
-  // PINTEREST PIN CARD COMPONENT
+  // PINTEREST PIN CARD COMPONENT + PROGRESSIVE SCROLL WATERFALL ENGINE
   // ==========================================================================
-  function createPinCard(pin) {
+  const FEED_BATCH_SIZE = 12;
+
+  const feedControllers = {
+    home: {
+      allPins: [],
+      renderedCount: 0,
+      cols: [],
+      colCount: 0,
+      container: null,
+      sentinel: null,
+      btnLoadMore: null,
+      statusEl: null
+    },
+    saved: {
+      allPins: [],
+      renderedCount: 0,
+      cols: [],
+      colCount: 0,
+      container: null,
+      sentinel: null,
+      btnLoadMore: null,
+      statusEl: null
+    },
+    history: {
+      allPins: [],
+      renderedCount: 0,
+      cols: [],
+      colCount: 0,
+      container: null,
+      sentinel: null,
+      btnLoadMore: null,
+      statusEl: null
+    }
+  };
+
+  function getMasonryColumnCount() {
+    const w = window.innerWidth || 1280;
+    if (w <= 720) return 2;
+    if (w <= 1100) return 3;
+    if (w <= 1600) return 4;
+    return 5;
+  }
+
+  const SKELETON_RATIO_CYCLE = ['4 / 5', '3 / 4', '1 / 1', '5 / 6', '4 / 3'];
+
+  function resolvePinSkeletonRatio(pin, cardIndex = 0) {
+    const raw = String(pin?.aspectRatio || '').trim();
+    const colonMatch = raw.match(/^(\d+(?:\.\d+)?)\s*[:/x]\s*(\d+(?:\.\d+)?)$/i);
+    if (colonMatch) {
+      const w = parseFloat(colonMatch[1]);
+      const h = parseFloat(colonMatch[2]);
+      if (w > 0 && h > 0) return `${w} / ${h}`;
+    }
+    return SKELETON_RATIO_CYCLE[cardIndex % SKELETON_RATIO_CYCLE.length];
+  }
+
+  function bindMediaRevealState(wrapperEl, imgEl) {
+    if (!wrapperEl || !imgEl) return;
+    const markLoaded = () => {
+      wrapperEl.classList.remove('is-media-loading');
+      wrapperEl.classList.add('is-media-loaded');
+    };
+    if (imgEl.complete && imgEl.naturalWidth > 0) {
+      markLoaded();
+      return;
+    }
+    wrapperEl.classList.remove('is-media-loaded');
+    wrapperEl.classList.add('is-media-loading');
+    const onDone = () => {
+      imgEl.removeEventListener('load', onDone);
+      imgEl.removeEventListener('error', onDone);
+      markLoaded();
+    };
+    imgEl.addEventListener('load', onDone, { once: true });
+    imgEl.addEventListener('error', onDone, { once: true });
+  }
+
+  function createSkeletonPinCard(cardIndex = 0) {
+    const ratio = SKELETON_RATIO_CYCLE[cardIndex % SKELETON_RATIO_CYCLE.length];
+    const titleWidths = ['76%', '84%', '66%', '72%', '80%'];
+    const metaWidths = ['48%', '54%', '42%', '50%', '46%'];
+    const card = document.createElement('article');
+    card.className = 'pin-card pin-skeleton-card';
+    card.setAttribute('aria-hidden', 'true');
+    card.innerHTML = `
+      <div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: ${ratio};">
+        <div class="pin-media-skeleton" aria-hidden="true">
+          <svg class="pin-skeleton-emblem"><use href="#icon-frame"></use></svg>
+        </div>
+      </div>
+      <div class="pin-skeleton-info">
+        <div class="pin-skeleton-line studio-shimmer-surface" style="width: ${titleWidths[cardIndex % titleWidths.length]};"></div>
+        <div class="pin-skeleton-meta">
+          <span class="pin-skeleton-avatar studio-shimmer-surface"></span>
+          <span class="pin-skeleton-line sm studio-shimmer-surface" style="width: ${metaWidths[cardIndex % metaWidths.length]};"></span>
+        </div>
+      </div>
+    `;
+    return card;
+  }
+
+  function renderMasonrySkeletonFeed(ctrl, containerEl, count = 10) {
+    initWaterfallColumns(ctrl, containerEl);
+    for (let i = 0; i < count; i++) {
+      const col = ctrl.cols[i % ctrl.cols.length];
+      if (col) col.appendChild(createSkeletonPinCard(i));
+    }
+  }
+
+  function setScrollSkeletonVisible(feedKey, visible) {
+    if (feedKey !== 'home' || !dom.homeScrollSkeletonGrid) return;
+    if (!visible) {
+      dom.homeScrollSkeletonGrid.style.display = 'none';
+      dom.homeScrollSkeletonGrid.innerHTML = '';
+      return;
+    }
+    const colCount = getMasonryColumnCount();
+    dom.homeScrollSkeletonGrid.innerHTML = '';
+    for (let i = 0; i < colCount; i++) {
+      dom.homeScrollSkeletonGrid.appendChild(createSkeletonPinCard(i));
+    }
+    dom.homeScrollSkeletonGrid.style.display = 'grid';
+  }
+
+  function createPinCard(pin, cardIndex = 0) {
     const isFav = state.favorites.has(pin.id);
     const card = document.createElement('article');
     card.className = 'pin-card';
     card.setAttribute('data-pin-id', pin.id);
 
-    const imgSrc = pin.thumbnail || pin.referenceImage || 'assets/prompts/royal-portrait.jpg';
+    const imgSrc = pin.thumbnail || pin.referenceImage || pin.image || 'assets/prompts/royal-portrait.jpg';
+    const isAboveFold = cardIndex < 4;
+    const imgLoadingAttr = isAboveFold ? '' : 'loading="lazy"';
+    const imgPriorityAttr = isAboveFold ? 'fetchpriority="high"' : 'fetchpriority="low"';
+    const skeletonRatio = resolvePinSkeletonRatio(pin, cardIndex);
 
     card.innerHTML = `
-      <div class="pin-media-container" data-action="view-pin" data-id="${pin.id}">
+      <div class="pin-media-container is-media-loading" data-action="view-pin" data-id="${pin.id}" style="--pin-skeleton-ratio: ${skeletonRatio};">
+        <div class="pin-media-skeleton" aria-hidden="true">
+          <svg class="pin-skeleton-emblem"><use href="#icon-frame"></use></svg>
+        </div>
         <img 
           class="pin-image" 
           src="${escapeHtml(imgSrc)}" 
           alt="${escapeHtml(pin.title)}" 
-          loading="lazy" 
+          ${imgLoadingAttr}
+          decoding="async"
+          ${imgPriorityAttr}
           referrerPolicy="no-referrer"
           onerror="this.onerror=null; this.src='assets/prompts/royal-portrait.jpg';"
         />
@@ -3015,6 +3283,11 @@ Looking forward to welcoming you! Thank you.`);
       </div>
     `;
 
+    bindMediaRevealState(
+      card.querySelector('.pin-media-container'),
+      card.querySelector('.pin-image')
+    );
+
     return card;
   }
 
@@ -3036,6 +3309,161 @@ Looking forward to welcoming you! Thank you.`);
     return div;
   }
 
+  function getTargetWaterfallColumn(cols, itemIndex) {
+    if (!cols || cols.length === 0) return null;
+    // First row fills left-to-right cleanly; subsequent cards append to shortest column
+    if (itemIndex < cols.length) return cols[itemIndex];
+    let shortest = cols[0];
+    let minHeight = cols[0].offsetHeight;
+    for (let i = 1; i < cols.length; i++) {
+      const h = cols[i].offsetHeight;
+      if (h < minHeight) {
+        minHeight = h;
+        shortest = cols[i];
+      }
+    }
+    return shortest;
+  }
+
+  function updateFeedSentinelUI(feedKey) {
+    const ctrl = feedControllers[feedKey];
+    if (!ctrl || !ctrl.sentinel) return;
+    const totalLoaded = ctrl.allPins.length;
+    const rendered = ctrl.renderedCount;
+    const hasMoreServer = feedKey === 'home' && state.cloudStyles.hasMore;
+    const hasMoreLocal = rendered < totalLoaded;
+    const isLoadingServer = feedKey === 'home' && state.cloudStyles.loading;
+
+    if (feedKey === 'home' && dom.feedCountNumber) {
+      dom.feedCountNumber.textContent = hasMoreServer ? `${rendered} / ${totalLoaded}+` : (rendered < totalLoaded ? `${rendered} / ${totalLoaded}` : String(totalLoaded));
+    }
+
+    if (totalLoaded === 0) {
+      ctrl.sentinel.style.display = 'none';
+      return;
+    }
+
+    ctrl.sentinel.style.display = 'flex';
+    if (ctrl.btnLoadMore) {
+      if (isLoadingServer) {
+        ctrl.btnLoadMore.style.display = 'inline-flex';
+        ctrl.btnLoadMore.disabled = true;
+        ctrl.btnLoadMore.textContent = 'Loading more styles...';
+      } else if (hasMoreLocal || hasMoreServer) {
+        ctrl.btnLoadMore.style.display = 'inline-flex';
+        ctrl.btnLoadMore.disabled = false;
+        ctrl.btnLoadMore.textContent = 'Load More Styles';
+      } else {
+        ctrl.btnLoadMore.style.display = 'none';
+      }
+    }
+    if (ctrl.statusEl) {
+      if (isLoadingServer) {
+        ctrl.statusEl.textContent = `Showing ${rendered} styles · Fetching next batch...`;
+      } else if (hasMoreLocal || hasMoreServer) {
+        ctrl.statusEl.textContent = `Showing ${rendered} styles · Scroll down for more`;
+      } else {
+        ctrl.statusEl.textContent = `Showing all ${totalLoaded} style${totalLoaded === 1 ? '' : 's'}`;
+      }
+    }
+  }
+
+  function initWaterfallColumns(ctrl, containerEl) {
+    const colCount = getMasonryColumnCount();
+    containerEl.innerHTML = '';
+    containerEl.classList.add('pins-masonry-cols');
+    ctrl.cols = [];
+    ctrl.colCount = colCount;
+    for (let i = 0; i < colCount; i++) {
+      const col = document.createElement('div');
+      col.className = 'pins-masonry-col';
+      containerEl.appendChild(col);
+      ctrl.cols.push(col);
+    }
+  }
+
+  function appendPinsToWaterfall(feedKey, count = FEED_BATCH_SIZE) {
+    const ctrl = feedControllers[feedKey];
+    if (!ctrl || !ctrl.container || ctrl.renderedCount >= ctrl.allPins.length) return 0;
+
+    const end = Math.min(ctrl.renderedCount + count, ctrl.allPins.length);
+    for (let i = ctrl.renderedCount; i < end; i++) {
+      const col = getTargetWaterfallColumn(ctrl.cols, i);
+      if (col) {
+        col.appendChild(createPinCard(ctrl.allPins[i], i));
+      }
+    }
+    ctrl.renderedCount = end;
+    updateFeedSentinelUI(feedKey);
+    return end;
+  }
+
+  async function loadMoreFeedItems(feedKey) {
+    const ctrl = feedControllers[feedKey];
+    if (!ctrl || !ctrl.container) return;
+
+    // On Home feed, fetch next server page once approaching the end of cloud styles
+    if (feedKey === 'home' && state.cloudStyles.hasMore && !state.cloudStyles.loading) {
+      const filteredCustomCount = ctrl.allPins.filter(p => p.isCustom).length;
+      if (ctrl.renderedCount + FEED_BATCH_SIZE > filteredCustomCount) {
+        setScrollSkeletonVisible('home', true);
+        try {
+          const res = await loadSharedStudioStyles({ reset: false, append: true });
+          if (res.ok && res.added > 0) {
+            const updatedFiltered = getFilteredPins();
+            const renderedIds = new Set(ctrl.allPins.slice(0, ctrl.renderedCount).map(p => Number(p.id)));
+            const newTail = updatedFiltered.filter(p => !renderedIds.has(Number(p.id)));
+            ctrl.allPins = [...ctrl.allPins.slice(0, ctrl.renderedCount), ...newTail];
+          }
+        } finally {
+          setScrollSkeletonVisible('home', false);
+        }
+      }
+    }
+
+    appendPinsToWaterfall(feedKey, FEED_BATCH_SIZE);
+    updateFeedSentinelUI(feedKey);
+  }
+
+  function renderProgressiveMasonry(feedKey, containerEl, sentinelEl, btnLoadMore, statusEl, pins, emptyTitle, emptyMessage) {
+    if (!containerEl) return;
+    const ctrl = feedControllers[feedKey];
+    ctrl.container = containerEl;
+    ctrl.sentinel = sentinelEl;
+    ctrl.btnLoadMore = btnLoadMore;
+    ctrl.statusEl = statusEl;
+    ctrl.allPins = pins;
+    ctrl.renderedCount = 0;
+
+    if (pins.length === 0) {
+      if (feedKey === 'home' && state.cloudStyles.loading) {
+        renderMasonrySkeletonFeed(ctrl, containerEl, getMasonryColumnCount() * 2);
+        updateFeedSentinelUI(feedKey);
+        return;
+      }
+      containerEl.classList.remove('pins-masonry-cols');
+      containerEl.innerHTML = '';
+      ctrl.cols = [];
+      containerEl.appendChild(createEmptyPinState(emptyTitle, emptyMessage));
+      updateFeedSentinelUI(feedKey);
+      return;
+    }
+
+    initWaterfallColumns(ctrl, containerEl);
+    appendPinsToWaterfall(feedKey, FEED_BATCH_SIZE);
+  }
+
+  function redistributeRenderedWaterfallOnResize() {
+    const newColCount = getMasonryColumnCount();
+    Object.entries(feedControllers).forEach(([key, ctrl]) => {
+      if (!ctrl.container || ctrl.renderedCount === 0 || ctrl.colCount === newColCount) return;
+      const renderedSliceCount = ctrl.renderedCount;
+      initWaterfallColumns(ctrl, ctrl.container);
+      ctrl.renderedCount = 0;
+      appendPinsToWaterfall(key, renderedSliceCount);
+    });
+  }
+
   // ==========================================================================
   // RENDER VIEWS
   // ==========================================================================
@@ -3055,11 +3483,8 @@ Looking forward to welcoming you! Thank you.`);
 
   function renderHomeFeed() {
     if (!dom.homePinsMasonry) return;
-    dom.homePinsMasonry.innerHTML = '';
-
     const pins = getFilteredPins();
 
-    if (dom.feedCountNumber) dom.feedCountNumber.textContent = pins.length;
     if (dom.feedTitleHeading) {
       if (state.searchQuery) {
         dom.feedTitleHeading.textContent = `Results for "${state.searchQuery}"`;
@@ -3070,15 +3495,16 @@ Looking forward to welcoming you! Thank you.`);
       }
     }
 
-    if (pins.length === 0) {
-      dom.homePinsMasonry.appendChild(
-        createEmptyPinState('No matching pins found', 'Try adjusting your search terms or selecting a different category.')
-      );
-    } else {
-      pins.forEach(pin => {
-        dom.homePinsMasonry.appendChild(createPinCard(pin));
-      });
-    }
+    renderProgressiveMasonry(
+      'home',
+      dom.homePinsMasonry,
+      dom.homeFeedSentinel,
+      dom.btnHomeLoadMore,
+      dom.lblHomeSentinelStatus,
+      pins,
+      'No matching pins found',
+      'Try adjusting your search terms or selecting a different category.'
+    );
   }
 
   function renderBoardsView() {
@@ -3106,11 +3532,14 @@ Looking forward to welcoming you! Thank you.`);
       boardCard.setAttribute('data-board-category', cat);
 
       boardCard.innerHTML = `
-        <div class="board-collage-cover">
-          <img class="board-main-thumb" src="${escapeHtml(mainImg)}" alt="${escapeHtml(cat)}" loading="lazy" referrerPolicy="no-referrer" />
+        <div class="board-collage-cover is-media-loading">
+          <div class="pin-media-skeleton" aria-hidden="true">
+            <svg class="pin-skeleton-emblem"><use href="#icon-frame"></use></svg>
+          </div>
+          <img class="board-main-thumb" src="${escapeHtml(mainImg)}" alt="${escapeHtml(cat)}" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
           <div class="board-sub-thumbs">
-            <img class="board-sub-thumb" src="${escapeHtml(sub1)}" alt="" loading="lazy" referrerPolicy="no-referrer" />
-            <img class="board-sub-thumb" src="${escapeHtml(sub2)}" alt="" loading="lazy" referrerPolicy="no-referrer" />
+            <img class="board-sub-thumb" src="${escapeHtml(sub1)}" alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+            <img class="board-sub-thumb" src="${escapeHtml(sub2)}" alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
           </div>
         </div>
         <div class="board-meta">
@@ -3119,57 +3548,58 @@ Looking forward to welcoming you! Thank you.`);
         </div>
       `;
 
+      bindMediaRevealState(
+        boardCard.querySelector('.board-collage-cover'),
+        boardCard.querySelector('.board-main-thumb')
+      );
+
       dom.boardsGridContainer.appendChild(boardCard);
     });
   }
 
   function renderSavedView() {
     if (!dom.savedPinsMasonry) return;
-    dom.savedPinsMasonry.innerHTML = '';
-
     if (state.savedSubTab === 'history') {
-      const historyPins = getHistoryPins();
-      if (historyPins.length === 0) {
-        dom.savedPinsMasonry.appendChild(
-          createEmptyPinState('No history yet', 'Pins you inspect or copy will automatically appear here.')
-        );
-      } else {
-        historyPins.forEach(pin => {
-          dom.savedPinsMasonry.appendChild(createPinCard(pin));
-        });
-      }
+      renderProgressiveMasonry(
+        'saved',
+        dom.savedPinsMasonry,
+        dom.savedFeedSentinel,
+        dom.btnSavedLoadMore,
+        dom.lblSavedSentinelStatus,
+        getHistoryPins(),
+        'No history yet',
+        'Pins you inspect or copy will automatically appear here.'
+      );
     } else {
-      const savedPins = getSavedPins();
-      if (savedPins.length === 0) {
-        dom.savedPinsMasonry.appendChild(
-          createEmptyPinState('Nothing saved yet', 'Click the heart icon on any style pin to save your favorite editing presets.')
-        );
-      } else {
-        savedPins.forEach(pin => {
-          dom.savedPinsMasonry.appendChild(createPinCard(pin));
-        });
-      }
+      renderProgressiveMasonry(
+        'saved',
+        dom.savedPinsMasonry,
+        dom.savedFeedSentinel,
+        dom.btnSavedLoadMore,
+        dom.lblSavedSentinelStatus,
+        getSavedPins(),
+        'Nothing saved yet',
+        'Click the heart icon on any style pin to save your favorite editing presets.'
+      );
     }
   }
 
   function renderHistoryView() {
     if (!dom.historyPinsMasonry) return;
-    dom.historyPinsMasonry.innerHTML = '';
-
     const historyPins = getHistoryPins();
     if (dom.btnClearHistory) {
       dom.btnClearHistory.style.display = historyPins.length > 0 ? 'inline-flex' : 'none';
     }
-
-    if (historyPins.length === 0) {
-      dom.historyPinsMasonry.appendChild(
-        createEmptyPinState('No recent activity', 'Copied or opened editing styles will appear in this history feed.')
-      );
-    } else {
-      historyPins.forEach(pin => {
-        dom.historyPinsMasonry.appendChild(createPinCard(pin));
-      });
-    }
+    renderProgressiveMasonry(
+      'history',
+      dom.historyPinsMasonry,
+      dom.historyFeedSentinel,
+      dom.btnHistoryLoadMore,
+      dom.lblHistorySentinelStatus,
+      historyPins,
+      'No recent activity',
+      'Copied or opened editing styles will appear in this history feed.'
+    );
   }
 
   function formatRelativeTime(isoStr) {
@@ -3257,9 +3687,32 @@ Looking forward to welcoming you! Thank you.`);
 
     const filteredUsers = getFilteredAdminUsers();
 
+    const isAdminSkeleton = state.admin.loading && users.length === 0;
+    document.querySelectorAll('#view-admin .admin-kpi-cell').forEach(cell => {
+      cell.classList.toggle('is-loading', isAdminSkeleton);
+    });
+
     if (dom.adminUsersTableBody) {
-      if (state.admin.loading && users.length === 0) {
-        dom.adminUsersTableBody.innerHTML = '<tr><td colspan="7" class="admin-table-empty">Loading studio subscribers from Clerk &amp; Supabase...</td></tr>';
+      if (isAdminSkeleton) {
+        dom.adminUsersTableBody.innerHTML = Array.from({ length: 5 }, (_, idx) => `
+          <tr class="admin-skeleton-row" aria-hidden="true">
+            <td>
+              <div class="admin-skeleton-user">
+                <div class="admin-skeleton-circle studio-shimmer-surface"></div>
+                <div class="admin-skeleton-stack">
+                  <div class="admin-skeleton-bar studio-shimmer-surface" style="width: ${idx % 2 === 0 ? '68%' : '56%'};"></div>
+                  <div class="admin-skeleton-bar sm studio-shimmer-surface" style="width: ${idx % 2 === 0 ? '84%' : '74%'};"></div>
+                </div>
+              </div>
+            </td>
+            <td><div class="admin-skeleton-bar studio-shimmer-surface" style="width: 92px; height: 28px; border-radius: 999px;"></div></td>
+            <td><div class="admin-skeleton-bar studio-shimmer-surface" style="width: 74px; height: 24px; border-radius: 999px;"></div></td>
+            <td class="num-col"><div class="admin-skeleton-bar studio-shimmer-surface" style="width: 32px; margin-left: auto;"></div></td>
+            <td class="num-col"><div class="admin-skeleton-bar studio-shimmer-surface" style="width: 28px; margin-left: auto;"></div></td>
+            <td><div class="admin-skeleton-bar sm studio-shimmer-surface" style="width: 64px;"></div></td>
+            <td class="actions-col"><div class="admin-skeleton-bar studio-shimmer-surface" style="width: 156px; height: 30px; border-radius: 999px; margin-left: auto;"></div></td>
+          </tr>
+        `).join('');
       } else if (state.admin.error && users.length === 0) {
         dom.adminUsersTableBody.innerHTML = `<tr><td colspan="7" class="admin-table-empty" style="color: #FCA5A5;">Unable to load Admin Console: ${escapeHtml(state.admin.error)}</td></tr>`;
       } else if (filteredUsers.length === 0) {
@@ -3687,9 +4140,24 @@ Looking forward to welcoming you! Thank you.`);
 
     // Media
     const imgSrc = pin.referenceImage || pin.image || pin.thumbnail || 'assets/prompts/royal-portrait.jpg';
-    dom.modalPinImage.src = imgSrc;
-    dom.modalPinImage.alt = pin.title;
-    dom.modalPinImage.classList.remove('zoomed');
+    if (dom.modalPinImgWrapper) {
+      let modalSkel = dom.modalPinImgWrapper.querySelector('.pin-media-skeleton');
+      if (!modalSkel) {
+        modalSkel = document.createElement('div');
+        modalSkel.className = 'pin-media-skeleton';
+        modalSkel.setAttribute('aria-hidden', 'true');
+        modalSkel.innerHTML = '<svg class="pin-skeleton-emblem"><use href="#icon-frame"></use></svg>';
+        dom.modalPinImgWrapper.prepend(modalSkel);
+      }
+      dom.modalPinImage.src = imgSrc;
+      dom.modalPinImage.alt = pin.title;
+      dom.modalPinImage.classList.remove('zoomed');
+      bindMediaRevealState(dom.modalPinImgWrapper, dom.modalPinImage);
+    } else {
+      dom.modalPinImage.src = imgSrc;
+      dom.modalPinImage.alt = pin.title;
+      dom.modalPinImage.classList.remove('zoomed');
+    }
     if (dom.modalBeforeImg) dom.modalBeforeImg.src = imgSrc;
 
     // Details
@@ -3881,6 +4349,7 @@ Looking forward to welcoming you! Thank you.`);
         if (dom.globalSearchInput) dom.globalSearchInput.value = '';
         renderCategoryChips();
         switchView('home');
+        scheduleCloudFilterSync(0);
       });
     }
 
@@ -3900,6 +4369,17 @@ Looking forward to welcoming you! Thank you.`);
       profileAvatar.addEventListener('click', () => switchView('saved'));
     }
 
+    let cloudFilterTimer = null;
+    function scheduleCloudFilterSync(delayMs = 0) {
+      if (cloudFilterTimer) clearTimeout(cloudFilterTimer);
+      cloudFilterTimer = setTimeout(() => {
+        const { queryKey } = getActiveCloudQueryParams();
+        if (state.cloudStyles.queryKey !== queryKey) {
+          void loadSharedStudioStyles({ reset: true });
+        }
+      }, delayMs);
+    }
+
     // 2. Pinterest Category Chips Bar
     if (dom.categoryChipsBar) {
       dom.categoryChipsBar.addEventListener('click', (e) => {
@@ -3915,6 +4395,7 @@ Looking forward to welcoming you! Thank you.`);
 
         if (state.currentView !== 'home') switchView('home');
         else renderHomeFeed();
+        scheduleCloudFilterSync(50);
       });
     }
 
@@ -3927,6 +4408,7 @@ Looking forward to welcoming you! Thank you.`);
 
         if (state.currentView !== 'home') switchView('home');
         else renderHomeFeed();
+        scheduleCloudFilterSync(320);
       });
     }
 
@@ -3937,8 +4419,38 @@ Looking forward to welcoming you! Thank you.`);
         dom.searchClearBtn.style.display = 'none';
         dom.globalSearchInput.focus();
         renderHomeFeed();
+        scheduleCloudFilterSync(0);
       });
     }
+
+    // Progressive Scroll-to-Load Sentinels & Load-More Fallback Buttons
+    [
+      ['home', dom.homeFeedSentinel, dom.btnHomeLoadMore],
+      ['saved', dom.savedFeedSentinel, dom.btnSavedLoadMore],
+      ['history', dom.historyFeedSentinel, dom.btnHistoryLoadMore]
+    ].forEach(([feedKey, sentinelEl, btnEl]) => {
+      if (btnEl) {
+        btnEl.addEventListener('click', () => {
+          void loadMoreFeedItems(feedKey);
+        });
+      }
+      if (sentinelEl && typeof IntersectionObserver !== 'undefined') {
+        const observer = new IntersectionObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              void loadMoreFeedItems(feedKey);
+            }
+          }
+        }, { rootMargin: '320px 0px', threshold: 0.01 });
+        observer.observe(sentinelEl);
+      }
+    });
+
+    let resizeMasonryTimer = null;
+    window.addEventListener('resize', () => {
+      if (resizeMasonryTimer) clearTimeout(resizeMasonryTimer);
+      resizeMasonryTimer = setTimeout(redistributeRenderedWaterfallOnResize, 160);
+    });
 
     // 4. Saved View Sub-tabs (Saved Pins vs History)
     if (dom.tabSavedPins && dom.tabSavedHistory) {
@@ -4054,6 +4566,7 @@ Looking forward to welcoming you! Thank you.`);
         state.selectedCategory = cat;
         renderCategoryChips();
         switchView('home');
+        scheduleCloudFilterSync(0);
         return;
       }
 
@@ -4065,6 +4578,7 @@ Looking forward to welcoming you! Thank you.`);
         if (dom.searchClearBtn) dom.searchClearBtn.style.display = 'none';
         renderCategoryChips();
         renderHomeFeed();
+        scheduleCloudFilterSync(0);
         return;
       }
     });

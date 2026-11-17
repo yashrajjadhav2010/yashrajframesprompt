@@ -12,6 +12,7 @@ const PLAN_LIMITS = {
 
 let cachedEnv = null;
 let cachedJwks = { fetchedAt: 0, keys: [] };
+let cachedAdminIds = { fetchedAt: 0, ids: null };
 
 function readDotEnvFiles() {
   const result = {};
@@ -463,10 +464,15 @@ async function readJsonBody(req) {
   });
 }
 
-function sendJson(res, statusCode, data) {
+function sendJson(res, statusCode, data, extraHeaders = {}) {
   res.statusCode = statusCode;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Cache-Control', extraHeaders['Cache-Control'] || 'no-store');
+  for (const [k, v] of Object.entries(extraHeaders)) {
+    if (k.toLowerCase() !== 'cache-control' && v !== undefined) {
+      res.setHeader(k, v);
+    }
+  }
   res.end(JSON.stringify(data));
 }
 
@@ -499,16 +505,23 @@ async function authenticateRequest(req) {
 }
 
 async function resolveAdminUserIds() {
+  const now = Date.now();
+  if (cachedAdminIds.ids && now - cachedAdminIds.fetchedAt < 10 * 60 * 1000) {
+    return cachedAdminIds.ids;
+  }
   const res = await clerkRequest(`/users?email_address[]=${encodeURIComponent(ADMIN_EMAIL)}&limit=10`);
   if (res.ok && Array.isArray(res.data)) {
-    return new Set(res.data.map(u => u.id).filter(Boolean));
+    const ids = new Set(res.data.map(u => u.id).filter(Boolean));
+    cachedAdminIds = { fetchedAt: now, ids };
+    return ids;
   }
-  return null;
+  return cachedAdminIds.ids || null;
 }
 
 function mapDbStyleToClient(row, includePrompt) {
   if (!row) return null;
   const img = row.reference_image || row.thumbnail || 'assets/prompts/01.jpeg';
+  const distinctThumb = row.thumbnail && row.thumbnail !== img ? row.thumbnail : undefined;
   return {
     id: Number(row.id),
     title: row.title || 'Untitled Style',
@@ -516,8 +529,7 @@ function mapDbStyleToClient(row, includePrompt) {
     prompt: includePrompt ? (row.prompt || '') : '',
     promptLocked: !includePrompt,
     referenceImage: img,
-    thumbnail: row.thumbnail || img,
-    image: img,
+    ...(distinctThumb ? { thumbnail: distinctThumb } : {}),
     aspectRatio: row.aspect_ratio || '2:3',
     description: row.description || `${row.category || 'Studio'} photography with studio lighting`,
     tags: Array.isArray(row.tags) ? row.tags : [],
@@ -545,9 +557,17 @@ export async function handleStudioApiRequest(req, res) {
     return true;
   }
 
-  // Public shared Studio Styles catalog:
+  // Public shared Studio Styles catalog (Paginated to prevent loading all cards/images at once):
   // Visual cards are visible to ALL users; prompts are included ONLY for Admin or approved active subscribers.
   if (pathname === '/api/styles' && method === 'GET') {
+    const parsedUrl = new URL(rawUrl, 'http://localhost');
+    const rawLimit = Number(parsedUrl.searchParams.get('limit'));
+    const rawOffset = Number(parsedUrl.searchParams.get('offset'));
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 48) : 12;
+    const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.floor(rawOffset) : 0;
+    const category = String(parsedUrl.searchParams.get('category') || '').trim();
+    const searchQ = String(parsedUrl.searchParams.get('q') || '').trim();
+
     let canAccessPrompts = false;
     const authHeader = String(req.headers.authorization || '');
     if (authHeader.startsWith('Bearer ')) {
@@ -566,25 +586,75 @@ export async function handleStudioApiRequest(req, res) {
       }
     }
 
-    const [stylesRes, adminIds] = await Promise.all([
-      supaRest('studio_styles?select=*&order=created_at.desc'),
-      resolveAdminUserIds()
-    ]);
+    const adminIds = await resolveAdminUserIds();
+    const selectFields = canAccessPrompts
+      ? 'id,user_id,title,category,prompt,reference_image,thumbnail,aspect_ratio,description,tags,is_custom,created_at'
+      : 'id,user_id,title,category,reference_image,thumbnail,aspect_ratio,description,tags,is_custom,created_at';
+
+    const queryParts = [
+      `select=${selectFields}`,
+      'order=created_at.desc',
+      `limit=${limit + 1}`,
+      `offset=${offset}`
+    ];
+
+    if (adminIds && adminIds.size > 0) {
+      const safeIds = Array.from(adminIds).filter(id => /^[a-zA-Z0-9_-]+$/.test(id));
+      if (safeIds.length === 1) {
+        queryParts.push(`user_id=eq.${encodeURIComponent(safeIds[0])}`);
+      } else if (safeIds.length > 1) {
+        queryParts.push(`user_id=in.(${safeIds.join(',')})`);
+      }
+    }
+
+    if (category && category.toLowerCase() !== 'all') {
+      queryParts.push(`category=eq.${encodeURIComponent(category)}`);
+    }
+
+    if (searchQ) {
+      const cleanQ = searchQ.replace(/[*(),]/g, ' ').trim();
+      if (cleanQ) {
+        queryParts.push(`or=(title.ilike.*${encodeURIComponent(cleanQ)}*,category.ilike.*${encodeURIComponent(cleanQ)}*,description.ilike.*${encodeURIComponent(cleanQ)}*)`);
+      }
+    }
+
+    const stylesRes = await supaRest(`studio_styles?${queryParts.join('&')}`);
+    const cacheHeaders = !authHeader
+      ? { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' }
+      : { 'Cache-Control': 'private, no-store' };
 
     if (!stylesRes.ok || !Array.isArray(stylesRes.data)) {
-      sendJson(res, 200, { ok: true, styles: [], promptUnlocked: canAccessPrompts });
+      sendJson(res, 200, {
+        ok: true,
+        styles: [],
+        hasMore: false,
+        nextOffset: offset,
+        limit,
+        offset,
+        promptUnlocked: canAccessPrompts
+      }, cacheHeaders);
       return true;
     }
 
-    const rows = (adminIds && adminIds.size > 0)
+    const filteredRows = (adminIds && adminIds.size > 0)
       ? stylesRes.data.filter(r => adminIds.has(r.user_id))
       : stylesRes.data;
 
-    const styles = rows
+    const hasMore = filteredRows.length > limit;
+    const slicedRows = hasMore ? filteredRows.slice(0, limit) : filteredRows;
+    const styles = slicedRows
       .map(r => mapDbStyleToClient(r, canAccessPrompts))
       .filter(Boolean);
 
-    sendJson(res, 200, { ok: true, styles, promptUnlocked: canAccessPrompts });
+    sendJson(res, 200, {
+      ok: true,
+      styles,
+      hasMore,
+      nextOffset: offset + slicedRows.length,
+      limit,
+      offset,
+      promptUnlocked: canAccessPrompts
+    }, cacheHeaders);
     return true;
   }
 

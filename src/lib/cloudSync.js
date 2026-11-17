@@ -171,6 +171,18 @@ export const PLAN_CATALOG = {
   }
 };
 
+function normalizeClientStyle(item) {
+  if (!item) return null;
+  const img = item.referenceImage || item.thumbnail || item.image || 'assets/prompts/01.jpeg';
+  return {
+    ...item,
+    id: Number(item.id),
+    referenceImage: img,
+    thumbnail: item.thumbnail || img,
+    image: img
+  };
+}
+
 function mapStyleFromDb(row) {
   if (!row) return null;
   const img = row.reference_image || row.thumbnail || 'assets/prompts/01.jpeg';
@@ -272,6 +284,8 @@ export class StudioCloudSync {
     this.mountedAuthEl = null;
     this.adminRealtimeChannel = null;
     this.adminPollTimer = null;
+    this.inFlightStyleRequests = new Map();
+    this.lastStylePromptUnlocked = null;
   }
 
   async getSessionJwt() {
@@ -785,35 +799,71 @@ export class StudioCloudSync {
     return null;
   }
 
-  async fetchSharedStyles() {
-    const headers = {};
-    if (this.user) {
-      const token = await this.getSessionJwt();
-      if (token) headers.Authorization = `Bearer ${token}`;
+  async fetchSharedStyles(options = {}) {
+    const limit = Number.isFinite(Number(options.limit)) && Number(options.limit) > 0
+      ? Math.min(Math.floor(Number(options.limit)), 48)
+      : 12;
+    const offset = Number.isFinite(Number(options.offset)) && Number(options.offset) >= 0
+      ? Math.floor(Number(options.offset))
+      : 0;
+    const category = String(options.category || '').trim();
+    const q = String(options.q || '').trim();
+
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset)
+    });
+    if (category && category.toLowerCase() !== 'all') params.set('category', category);
+    if (q) params.set('q', q);
+
+    const requestKey = `${this.user?.id || 'anon'}::${params.toString()}`;
+    if (this.inFlightStyleRequests.has(requestKey)) {
+      return this.inFlightStyleRequests.get(requestKey);
     }
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = controller ? setTimeout(() => controller.abort(), 15000) : null;
-    try {
-      const res = await fetch('/api/styles', {
-        method: 'GET',
-        signal: controller ? controller.signal : undefined,
-        headers
-      });
-      if (!res.ok) {
-        return { ok: false, styles: null, promptUnlocked: false };
+
+    const promise = (async () => {
+      const headers = {};
+      if (this.user) {
+        const token = await this.getSessionJwt();
+        if (token) headers.Authorization = `Bearer ${token}`;
       }
-      const data = await res.json();
-      return {
-        ok: true,
-        styles: Array.isArray(data?.styles) ? data.styles : [],
-        promptUnlocked: Boolean(data?.promptUnlocked)
-      };
-    } catch (err) {
-      console.warn('fetchSharedStyles failed:', err);
-      return { ok: false, styles: null, promptUnlocked: false };
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = controller ? setTimeout(() => controller.abort(), 15000) : null;
+      try {
+        const res = await fetch(`/api/styles?${params.toString()}`, {
+          method: 'GET',
+          signal: controller ? controller.signal : undefined,
+          headers
+        });
+        if (!res.ok) {
+          return { ok: false, styles: null, hasMore: false, nextOffset: offset, promptUnlocked: false };
+        }
+        const data = await res.json();
+        const styles = Array.isArray(data?.styles)
+          ? data.styles.map(normalizeClientStyle).filter(Boolean)
+          : [];
+        const promptUnlocked = Boolean(data?.promptUnlocked);
+        this.lastStylePromptUnlocked = promptUnlocked;
+        return {
+          ok: true,
+          styles,
+          hasMore: Boolean(data?.hasMore),
+          nextOffset: Number.isFinite(Number(data?.nextOffset)) ? Number(data.nextOffset) : (offset + styles.length),
+          limit,
+          offset,
+          promptUnlocked
+        };
+      } catch (err) {
+        console.warn('fetchSharedStyles failed:', err);
+        return { ok: false, styles: null, hasMore: false, nextOffset: offset, promptUnlocked: false };
+      } finally {
+        if (timer) clearTimeout(timer);
+        this.inFlightStyleRequests.delete(requestKey);
+      }
+    })();
+
+    this.inFlightStyleRequests.set(requestKey, promise);
+    return promise;
   }
 
   async bootstrapCloudState() {
@@ -824,8 +874,12 @@ export class StudioCloudSync {
       // 1. Fetch authoritative subscription & lock status from server API (zero RLS/JWT dependency)
       await this.refreshSubscriptionFromServer();
 
-      // 2. Fetch shared Admin-published studio styles via /api/styles (visible to all users; prompts gated server-side)
-      const sharedPromise = this.fetchSharedStyles();
+      // 2. Fetch first page of shared studio styles ONLY if user can unlock prompts OR initial styles haven't loaded yet
+      const canUnlock = this.isAdmin() || this.subscription?.plan_status === 'active';
+      const shouldFetchUnlockedStyles = canUnlock || this.lastStylePromptUnlocked === null;
+      const sharedPromise = shouldFetchUnlockedStyles
+        ? this.fetchSharedStyles({ limit: 12, offset: 0 })
+        : Promise.resolve({ ok: false, skipped: true, styles: null, hasMore: false, nextOffset: 0, promptUnlocked: false });
 
       let remoteOrders = [];
       let remotePrefs = null;
@@ -853,6 +907,11 @@ export class StudioCloudSync {
         if (typeof this.callbacks.onCloudBootstrap === 'function') {
           await this.callbacks.onCloudBootstrap({
             styles: sharedStylesRes.ok ? sharedStylesRes.styles : null,
+            stylesPageMeta: sharedStylesRes.ok ? {
+              hasMore: sharedStylesRes.hasMore,
+              nextOffset: sharedStylesRes.nextOffset,
+              promptUnlocked: sharedStylesRes.promptUnlocked
+            } : null,
             orders: remoteOrders,
             preferences: remotePrefs,
             subscription: this.subscription
@@ -863,6 +922,11 @@ export class StudioCloudSync {
         if (typeof this.callbacks.onCloudBootstrap === 'function') {
           await this.callbacks.onCloudBootstrap({
             styles: sharedStylesRes.ok ? sharedStylesRes.styles : null,
+            stylesPageMeta: sharedStylesRes.ok ? {
+              hasMore: sharedStylesRes.hasMore,
+              nextOffset: sharedStylesRes.nextOffset,
+              promptUnlocked: sharedStylesRes.promptUnlocked
+            } : null,
             orders: remoteOrders,
             preferences: remotePrefs,
             subscription: this.subscription

@@ -374,7 +374,19 @@
 
         <!-- The Pinterest Waterfall Masonry Container -->
         <div class="pins-masonry" id="homePinsMasonry">
-          <!-- Rendered dynamically -->
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 4 / 5;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 74%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 48%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 3 / 4;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 82%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 52%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 1 / 1;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 68%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 44%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 5 / 6;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 78%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 50%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 4 / 5;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 70%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 46%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 3 / 4;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 76%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 54%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 4 / 3;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 64%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 42%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 5 / 6;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 80%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 48%;"></span></div></div></article>
+        </div>
+        <div class="feed-scroll-skeleton-grid" id="homeScrollSkeletonGrid" aria-hidden="true" style="display: none;"></div>
+        <div class="feed-scroll-sentinel" id="homeFeedSentinel" style="display: none;">
+          <button type="button" class="btn-load-more-pins" id="btnHomeLoadMore">Load More Styles</button>
+          <span class="feed-sentinel-status" id="lblHomeSentinelStatus"></span>
         </div>
       </section>
 
@@ -418,7 +430,11 @@
 
         <!-- Saved Pins Masonry -->
         <div class="pins-masonry" id="savedPinsMasonry">
-          <!-- Rendered dynamically -->
+          <!-- Rendered dynamically in scroll batches -->
+        </div>
+        <div class="feed-scroll-sentinel" id="savedFeedSentinel" style="display: none;">
+          <button type="button" class="btn-load-more-pins" id="btnSavedLoadMore">Load More Saved Styles</button>
+          <span class="feed-sentinel-status" id="lblSavedSentinelStatus"></span>
         </div>
       </section>
 
@@ -436,7 +452,11 @@
         </div>
 
         <div class="pins-masonry" id="historyPinsMasonry">
-          <!-- Rendered dynamically -->
+          <!-- Rendered dynamically in scroll batches -->
+        </div>
+        <div class="feed-scroll-sentinel" id="historyFeedSentinel" style="display: none;">
+          <button type="button" class="btn-load-more-pins" id="btnHistoryLoadMore">Load More History</button>
+          <span class="feed-sentinel-status" id="lblHistorySentinelStatus"></span>
         </div>
       </section>
 

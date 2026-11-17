@@ -1049,6 +1049,7 @@ h1, h2, h3, h4, .font-display {
 }
 
 .board-collage-cover {
+  position: relative;
   width: 100%;
   aspect-ratio: 16 / 10;
   display: grid;
@@ -6866,6 +6867,422 @@ body:not(.is-admin-user) #btnModalDeleteCustom {
   color: var(--text-secondary);
   letter-spacing: 0.02em;
 }
+
+/* ==========================================================================
+   PROGRESSIVE WATERFALL COLUMNS & SCROLL-TO-LOAD SENTINEL
+   ========================================================================== */
+.pins-masonry.pins-masonry-cols {
+  column-count: initial !important;
+  column-gap: initial !important;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  width: 100%;
+}
+
+.pins-masonry-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pins-masonry-col .pin-card {
+  display: block;
+  width: 100%;
+  break-inside: auto;
+}
+
+@media (max-width: 1100px) {
+  .pins-masonry.pins-masonry-cols {
+    gap: 14px;
+  }
+}
+
+@media (max-width: 720px) {
+  .pins-masonry.pins-masonry-cols {
+    gap: 10px;
+  }
+}
+
+.feed-scroll-sentinel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 16px 12px;
+  min-height: 72px;
+  text-align: center;
+}
+
+.btn-load-more-pins {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 22px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(214, 184, 121, 0.42);
+  background: rgba(214, 184, 121, 0.12);
+  color: var(--accent-gold);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-snappy), color var(--transition-snappy), border-color var(--transition-snappy), transform var(--transition-snappy);
+}
+
+.btn-load-more-pins:hover:not(:disabled) {
+  background: var(--accent-gold);
+  border-color: var(--accent-gold);
+  color: #111215;
+}
+
+.btn-load-more-pins:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.feed-sentinel-status {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}
+
+/* ==========================================================================
+   PREMIUM STUDIO LOADING SKELETON SYSTEM (Obsidian & Champagne Sheen)
+   ========================================================================== */
+@keyframes studioSkeletonSweep {
+  0% {
+    transform: translate3d(-115%, 0, 0);
+  }
+  100% {
+    transform: translate3d(115%, 0, 0);
+  }
+}
+
+@keyframes studioSkeletonFadeIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.studio-shimmer-surface {
+  position: relative;
+  overflow: hidden;
+  background-color: #191a1e;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+}
+
+.studio-shimmer-surface::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translate3d(-115%, 0, 0);
+  background: linear-gradient(
+    108deg,
+    transparent 12%,
+    rgba(255, 255, 255, 0.028) 36%,
+    rgba(214, 184, 121, 0.11) 50%,
+    rgba(255, 255, 255, 0.03) 64%,
+    transparent 88%
+  );
+  animation: studioSkeletonSweep 1.65s cubic-bezier(0.35, 0, 0.25, 1) infinite;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* Pin Card Media Skeleton + Smooth Reveal */
+.pin-media-container.is-media-loading {
+  aspect-ratio: var(--pin-skeleton-ratio, 4 / 5);
+  background-color: #18191c;
+}
+
+.pin-media-container.is-media-loading .pin-image {
+  opacity: 0;
+  transform: scale(1.025);
+}
+
+.pin-media-container.is-media-loaded .pin-image {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.pin-media-container .pin-image {
+  transition:
+    opacity 0.36s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.25s ease;
+}
+
+.pin-media-container:hover .pin-image {
+  transform: scale(1.03);
+}
+
+.pin-media-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 35%, rgba(214, 184, 121, 0.055), rgba(20, 21, 24, 0.96) 72%);
+  opacity: 1;
+  transition: opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s linear;
+  pointer-events: none;
+}
+
+.pin-media-skeleton::before {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border-radius: calc(var(--radius-pin) - 6px);
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  pointer-events: none;
+}
+
+.pin-media-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translate3d(-115%, 0, 0);
+  background: linear-gradient(
+    108deg,
+    transparent 12%,
+    rgba(255, 255, 255, 0.03) 36%,
+    rgba(214, 184, 121, 0.12) 50%,
+    rgba(255, 255, 255, 0.03) 64%,
+    transparent 88%
+  );
+  animation: studioSkeletonSweep 1.65s cubic-bezier(0.35, 0, 0.25, 1) infinite;
+  will-change: transform;
+}
+
+.pin-skeleton-emblem {
+  width: 28px;
+  height: 28px;
+  color: rgba(214, 184, 121, 0.3);
+  position: relative;
+  z-index: 1;
+}
+
+.pin-media-container.is-media-loaded .pin-media-skeleton {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.pin-media-container.is-media-loaded .pin-media-skeleton::after {
+  animation: none;
+}
+
+/* Modal & Board Thumb Media Skeletons */
+.modal-pin-img-wrapper.is-media-loading {
+  min-height: 360px;
+  position: relative;
+  background-color: #18191c;
+}
+
+.modal-pin-img-wrapper.is-media-loading .modal-pin-img {
+  opacity: 0;
+}
+
+.modal-pin-img-wrapper.is-media-loaded .modal-pin-img {
+  opacity: 1;
+  transition: opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-pin-img-wrapper.is-media-loaded .pin-media-skeleton {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.modal-pin-img-wrapper.is-media-loaded .pin-media-skeleton::after {
+  animation: none;
+}
+
+.board-collage-cover.is-media-loading {
+  background-color: #191a1e;
+}
+
+.board-collage-cover.is-media-loading img {
+  opacity: 0;
+}
+
+.board-collage-cover.is-media-loaded img {
+  opacity: 1;
+  transition: opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.board-collage-cover.is-media-loaded .pin-media-skeleton {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Full Masonry Skeleton Cards */
+.pin-skeleton-card {
+  cursor: default;
+  pointer-events: none;
+  animation: studioSkeletonFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pin-skeleton-card:nth-child(4n + 2) .studio-shimmer-surface::after {
+  animation-delay: 0.14s;
+}
+
+.pin-skeleton-card:nth-child(4n + 3) .studio-shimmer-surface::after {
+  animation-delay: 0.28s;
+}
+
+.pin-skeleton-card:nth-child(4n + 4) .studio-shimmer-surface::after {
+  animation-delay: 0.42s;
+}
+
+.pin-skeleton-media {
+  aspect-ratio: var(--pin-skeleton-ratio, 4 / 5);
+  border-radius: var(--radius-pin);
+  background: radial-gradient(circle at 50% 35%, rgba(214, 184, 121, 0.045), #18191d 72%);
+}
+
+.pin-skeleton-info {
+  padding: 10px 4px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pin-skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+}
+
+.pin-skeleton-line.sm {
+  height: 9px;
+  border-radius: 5px;
+}
+
+.pin-skeleton-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pin-skeleton-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+/* Scroll-to-Load Skeleton Row */
+.feed-scroll-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 18px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+@media (max-width: 1600px) {
+  .feed-scroll-skeleton-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1100px) {
+  .feed-scroll-skeleton-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (max-width: 720px) {
+  .feed-scroll-skeleton-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+/* Admin Console Loading Skeletons */
+.admin-skeleton-row td {
+  padding: 14px 12px;
+}
+
+.admin-skeleton-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-skeleton-circle {
+  width: 34px;
+  height: 34px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.admin-skeleton-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.admin-skeleton-bar {
+  height: 11px;
+  border-radius: 6px;
+}
+
+.admin-skeleton-bar.sm {
+  height: 9px;
+}
+
+.admin-kpi-cell.is-loading .admin-kpi-value {
+  color: transparent;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background-color: #191a1e;
+  min-width: 56px;
+  display: inline-block;
+}
+
+.admin-kpi-cell.is-loading .admin-kpi-value::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translate3d(-115%, 0, 0);
+  background: linear-gradient(
+    108deg,
+    transparent 12%,
+    rgba(214, 184, 121, 0.14) 50%,
+    transparent 88%
+  );
+  animation: studioSkeletonSweep 1.5s cubic-bezier(0.35, 0, 0.25, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-shimmer-surface::after,
+  .pin-media-skeleton::after,
+  .admin-kpi-cell.is-loading .admin-kpi-value::after {
+    animation: none !important;
+  }
+  .pin-skeleton-card {
+    animation: none !important;
+  }
+  .pin-media-container .pin-image,
+  .pin-media-skeleton {
+    transition: opacity 0.15s linear !important;
+  }
+}
+
+
 
 
 
