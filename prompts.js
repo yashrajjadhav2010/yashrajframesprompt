@@ -136,7 +136,7 @@ const prompts = [
   description: "Aesthetic circular mosaic framing, elegant emerald green gown styling, and romantic typographic accents.",
   thumbnail: "assets/prompts/14.jpg",
   referenceImage: "assets/prompts/14.jpg",
-  prompt: `A high-end, romantic editorial collage poster design on a clean off-white background adorned with floating pink butterflies, red hearts, and a daisy flower accent. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes. The background features a large curved arc arrangement containing multiple stacked black-and-white portraits showcasing different expressive close-ups of the exact same subject. In the foreground, a vibrant full-color cutout of the same subject wearing an elegant long dark-green heavily embroidered gown. In the central circle and surrounding areas, stylish script typography reads "Queen of Beauty" and "I Love you", with the name "Divya" in a large cursive font at the bottom alongside the phrase "Capture the moment" and a heartbeat line icon. High-end fashion editorial photography, soft lighting, absolute face consistency.`,
+  prompt: `A high-end, romantic editorial collage poster design on a clean off-white background adorned with floating pink butterflies, red hearts, and a daisy flower accent. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes. The background features a large curved arc arrangement containing multiple stacked black-and-white portraits showcasing different expressive close-ups of the exact same subject. In the foreground, a vibrant full-color cutout of the same subject wearing an elegant long dark-green heavily embroidered gown. In the central circle and surrounding areas, stylish script typography reads "Queen of Beauty" and "I Love you", with the name "YOUR NAME" in a large cursive font at the bottom alongside the phrase "Capture the moment" and a heartbeat line icon. High-end fashion editorial photography, soft lighting, absolute face consistency.`,
   featured: false,
   tags: ["Editorial", "Fashion", "Portrait", "Collage"]
 },
@@ -180,7 +180,7 @@ const prompts = [
   description: "Aesthetic semi-circular arched frame mosaic, elegant dark green overshirt styling, and custom typography accents.",
   thumbnail: "assets/prompts/18.jpg",
   referenceImage: "assets/prompts/18.jpg",
-  prompt: `A stylish, modern birthday poster design on a clean light-grey studio background[cite: 18]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[cite: 18]. The background features a large semi-circular arched mosaic containing multiple black-and-white panels showing different candid portraits and poses of the exact same subject wearing a cap and sunglasses[cite: 18]. In the foreground center, a full-length portrait of the subject wearing an unbuttoned dark green overshirt, white pants, a wristwatch, and white sneakers[cite: 18]. On the left and right sides, sleek typography reads "Happy BIRTHDAY" and "Mr. Professor" with a crown graphic, accompanied by inspirational subtitle blocks[cite: 18]. Professional editorial styling, clean lighting, absolute face consistency[cite: 18].`,
+  prompt: `A stylish, modern birthday poster design on a clean light-grey studio background[cite: 18]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[cite: 18]. The background features a large semi-circular arched mosaic containing multiple black-and-white panels showing different candid portraits and poses of the exact same subject wearing a cap and sunglasses[cite: 18]. In the foreground center, a full-length portrait of the subject wearing an unbuttoned dark green overshirt, white pants, a wristwatch, and white sneakers[cite: 18]. On the left and right sides, sleek typography reads "Happy BIRTHDAY" and "YOUR NAME" with a crown graphic, accompanied by inspirational subtitle blocks[cite: 18]. Professional editorial styling, clean lighting, absolute face consistency[cite: 18].`,
   featured: false,
   tags: ["Birthday", "Editorial", "Portrait", "Collage"]
 },
@@ -205,7 +205,43 @@ const prompts = [
   prompt: `A bold and modern typographic birthday poster design on a solid dark black background[cite: 16]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[cite: 16]. In the upper background, massive bold red sans-serif block lettering spells out "HAPPY BIRTHDAY"[cite: 16]. In the center foreground, a full-length portrait of the subject standing casually in an oversized white shirt with rolled sleeves, blue loose-fit jeans, and white sneakers[cite: 16]. Below the main heading, white handwritten script typography reads "to my" on the left and "little brother" on the right[cite: 16]. High-contrast studio lighting, sharp editorial framing, absolute face consistency[cite: 16].`,
   featured: false,
   tags: ["Birthday", "Typographic", "Minimalist", "Editorial"]
+},
+{
+  id: 19,
+  title: "Calendar Widget Aesthetic Birthday Poster",
+  category: "Birthday",
+  description: "Monochrome dark background with a smartphone mirror selfie aesthetic, custom calendar widget overlay, and glowing birthday typography.",
+  thumbnail: "assets/prompts/21.jpeg",
+  referenceImage: "assets/prompts/21.jpeg",
+  prompt: `A stylish, aesthetic birthday poster design on a moody, dark charcoal-black background featuring soft floral elements at the bottom[span_0](start_span)[span_0](end_span). ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[span_1](start_span)[span_1](end_span). In the background, a large monochrome (black-and-white) mirror selfie portrait of the exact same subject holding a smartphone[span_2](start_span)[span_2](end_span). Overlaid in the lower-left section is a sleek, dark-themed digital calendar widget displaying a month grid with a highlighted birth date, year indicator "2003", and month number "04[span_3](start_span)"[span_3](end_span). Next to the calendar widget is a small rounded rectangular photo frame showing a color portrait of the subject holding a bouquet of roses[span_4](start_span)[span_4](end_span). At the bottom, bold white lettering reads "Happy" followed by a glowing gold cursive script reading "Birthday[span_5](start_span)"[span_5](end_span). High-end smartphone aesthetic, moody editorial lighting, absolute face consistency[span_6](start_span)[span_6](end_span).`,
+  featured: false,
+  tags: ["Birthday", "Aesthetic", "Calendar", "Editorial"]
+},
+{
+  id: 20,
+  title: "College Aesthetic Birthday Collage",
+  category: "Birthday",
+  description: "Warm glowing sunlit aesthetic with torn paper collage framing, student ID lanyard styling, and pastel typography.",
+  thumbnail: "assets/prompts/22.jpeg",
+  referenceImage: "assets/prompts/22.jpeg",
+  prompt: `A warm, sun-drenched aesthetic birthday poster design on a soft beige background adorned with cute hand-drawn doodles of butterflies, planets, and floral sketches[span_0](start_span)[span_0](end_span). ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[span_1](start_span)[span_1](end_span). In the center foreground, a full-color portrait of the subject wearing a floral sleeveless top and a student ID lanyard around the neck[span_2](start_span)[span_2](end_span). Surrounding the central figure is an artistic torn-paper photo collage featuring multiple smaller portrait frames showing different candid expressions of the exact same subject[span_3](start_span)[span_3](end_span). At the bottom, bold green-blue serif typography reads "HAPPY BIRTHDAY" with the word "Girl" in elegant cursive script underneath[span_4](start_span)[span_4](end_span). Soft dreamy lighting, whimsical scrapbook editorial style, absolute face consistency[span_5](start_span)[span_5](end_span).`,
+  featured: false,
+  tags: ["Birthday", "Aesthetic", "Collage", "Editorial"]
+},
+{
+  id: 21,
+  title: "Ultra-High-Resolution 4K Fidelity Upscale",
+  category: "Upscaling & Restoration",
+  description: "Ultra-high-resolution 4K fidelity upscale preserving absolute identity, original facial anatomy, authentic textures, and native lighting without stylization.",
+  thumbnail: "assets/prompts/23.png",
+  referenceImage: "assets/prompts/23.png",
+  prompt: `Ultra-high-resolution 4K upscaling based on a given reference image. Absolute fidelity to the original facial anatomy, proportions, and identity. Maintain expression, gaze, pose, camera angle, framing, and perspective without distortion. Clothing, hair, skin, and background elements must remain unchanged in structure, placement, and design. Restore fine details with natural realism. Enhance pores, fine lines, hair strands, eyelashes, fabric weaves, seams, and material edges without adding stylization. Maintain the original color science, white balance, and tonal relationships exactly as captured. Lighting direction, intensity, contrast, and shadow behavior must match the source image exactly, only with increased clarity and expanded dynamic range. No relighting, no reshaping. Remove noise. Apply controlled sharpening and reconstruct high-frequency details. Eliminate compression artifacts and noise while maintaining authentic textures. No smoothing, no plastic skin, no artificial shine. Facial features must remain consistent throughout the image with coherent anatomy and clean, stable edges. Negative constraints: no distortion, no facial shifts, no addition or subtraction of anatomy, no changes to hands, no shape changes, no perspective shifts, no text or graphics, no hallucinated details, no stylized rendering. The final result should look like a photorealistic scale-up that matches the reference exactly, only clearer, sharper, and higher resolution.`,
+  featured: false,
+  tags: ["Upscale", "Restoration", "Photorealistic", "4K"]
 }
+
+
+
 
 ];
 
