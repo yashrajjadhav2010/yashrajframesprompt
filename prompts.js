@@ -257,6 +257,7 @@ const CATEGORIES = [
   "Royal",
   "Cinematic",
   "Restoration",
+  "Upscaling & Restoration",
   "Passport",
   "Festival",
   "Editorial Portrait",

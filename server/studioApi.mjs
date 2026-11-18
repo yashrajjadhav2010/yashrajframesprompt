@@ -12,7 +12,47 @@ const PLAN_LIMITS = {
 
 let cachedEnv = null;
 let cachedJwks = { fetchedAt: 0, keys: [] };
-let cachedAdminIds = { fetchedAt: 0, ids: null };
+let cachedAdminDir = { fetchedAt: 0, ids: null, pinBadges: {} };
+
+const VALID_BADGE_TONES = new Set(['crimson', 'amazon', 'flipkart', 'gold', 'emerald', 'violet']);
+
+function normalizeSpotlightBadgeEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const rawLabel = typeof entry.label === 'string'
+    ? entry.label
+    : (typeof entry.l === 'string' ? entry.l : '');
+  const cleanLabel = rawLabel
+    .replace(/[<>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 24);
+  if (!cleanLabel) return null;
+  const rawTone = String(entry.tone || entry.t || 'crimson').trim().toLowerCase();
+  const cleanTone = VALID_BADGE_TONES.has(rawTone) ? rawTone : 'crimson';
+  return { l: cleanLabel, t: cleanTone };
+}
+
+function compactPinBadgesMap(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out = {};
+  const keys = Object.keys(raw).slice(-140);
+  for (const key of keys) {
+    const cleanId = String(key || '').trim();
+    if (!/^[a-zA-Z0-9_-]{1,40}$/.test(cleanId)) continue;
+    const norm = normalizeSpotlightBadgeEntry(raw[key]);
+    if (norm) out[cleanId] = norm;
+  }
+  return out;
+}
+
+function expandPinBadgesMap(raw) {
+  const compact = compactPinBadgesMap(raw);
+  const expanded = {};
+  for (const [pinId, entry] of Object.entries(compact)) {
+    expanded[pinId] = { label: entry.l, tone: entry.t };
+  }
+  return expanded;
+}
 
 function readDotEnvFiles() {
   const result = {};
@@ -504,18 +544,30 @@ async function authenticateRequest(req) {
   };
 }
 
-async function resolveAdminUserIds() {
+async function resolveAdminDirectory(forceRefresh = false) {
   const now = Date.now();
-  if (cachedAdminIds.ids && now - cachedAdminIds.fetchedAt < 10 * 60 * 1000) {
-    return cachedAdminIds.ids;
+  if (!forceRefresh && cachedAdminDir.ids && now - cachedAdminDir.fetchedAt < 60 * 1000) {
+    return cachedAdminDir;
   }
   const res = await clerkRequest(`/users?email_address[]=${encodeURIComponent(ADMIN_EMAIL)}&limit=10`);
   if (res.ok && Array.isArray(res.data)) {
     const ids = new Set(res.data.map(u => u.id).filter(Boolean));
-    cachedAdminIds = { fetchedAt: now, ids };
-    return ids;
+    let mergedBadges = {};
+    for (const adminUser of res.data) {
+      const metaBadges = adminUser?.public_metadata?.pinBadges;
+      if (metaBadges && typeof metaBadges === 'object') {
+        mergedBadges = { ...mergedBadges, ...compactPinBadgesMap(metaBadges) };
+      }
+    }
+    cachedAdminDir = { fetchedAt: now, ids, pinBadges: mergedBadges };
+    return cachedAdminDir;
   }
-  return cachedAdminIds.ids || null;
+  return cachedAdminDir;
+}
+
+async function resolveAdminUserIds() {
+  const dir = await resolveAdminDirectory(false);
+  return dir.ids || null;
 }
 
 function mapDbStyleToClient(row, includePrompt) {
@@ -557,6 +609,15 @@ export async function handleStudioApiRequest(req, res) {
     return true;
   }
 
+  if (pathname === '/api/pin-badges' && method === 'GET') {
+    const dir = await resolveAdminDirectory(false);
+    sendJson(res, 200, {
+      ok: true,
+      badges: expandPinBadgesMap(dir.pinBadges)
+    });
+    return true;
+  }
+
   // Public shared Studio Styles catalog (Paginated to prevent loading all cards/images at once):
   // Visual cards are visible to ALL users; prompts are included ONLY for Admin or approved active subscribers.
   if (pathname === '/api/styles' && method === 'GET') {
@@ -567,6 +628,7 @@ export async function handleStudioApiRequest(req, res) {
     const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.floor(rawOffset) : 0;
     const category = String(parsedUrl.searchParams.get('category') || '').trim();
     const searchQ = String(parsedUrl.searchParams.get('q') || '').trim();
+    const styleId = String(parsedUrl.searchParams.get('id') || '').trim();
 
     let canAccessPrompts = false;
     const authHeader = String(req.headers.authorization || '');
@@ -586,7 +648,9 @@ export async function handleStudioApiRequest(req, res) {
       }
     }
 
-    const adminIds = await resolveAdminUserIds();
+    const adminDir = await resolveAdminDirectory(false);
+    const adminIds = adminDir.ids || null;
+    const pinBadges = expandPinBadgesMap(adminDir.pinBadges);
     const selectFields = canAccessPrompts
       ? 'id,user_id,title,category,prompt,reference_image,thumbnail,aspect_ratio,description,tags,is_custom,created_at'
       : 'id,user_id,title,category,reference_image,thumbnail,aspect_ratio,description,tags,is_custom,created_at';
@@ -594,8 +658,8 @@ export async function handleStudioApiRequest(req, res) {
     const queryParts = [
       `select=${selectFields}`,
       'order=created_at.desc',
-      `limit=${limit + 1}`,
-      `offset=${offset}`
+      `limit=${styleId ? 1 : limit + 1}`,
+      `offset=${styleId ? 0 : offset}`
     ];
 
     if (adminIds && adminIds.size > 0) {
@@ -607,26 +671,31 @@ export async function handleStudioApiRequest(req, res) {
       }
     }
 
-    if (category && category.toLowerCase() !== 'all') {
-      queryParts.push(`category=eq.${encodeURIComponent(category)}`);
-    }
+    if (styleId && /^[a-zA-Z0-9_-]{1,64}$/.test(styleId)) {
+      queryParts.push(`id=eq.${encodeURIComponent(styleId)}`);
+    } else {
+      if (category && category.toLowerCase() !== 'all') {
+        queryParts.push(`category=eq.${encodeURIComponent(category)}`);
+      }
 
-    if (searchQ) {
-      const cleanQ = searchQ.replace(/[*(),]/g, ' ').trim();
-      if (cleanQ) {
-        queryParts.push(`or=(title.ilike.*${encodeURIComponent(cleanQ)}*,category.ilike.*${encodeURIComponent(cleanQ)}*,description.ilike.*${encodeURIComponent(cleanQ)}*)`);
+      if (searchQ) {
+        const cleanQ = searchQ.replace(/[*(),]/g, ' ').trim();
+        if (cleanQ) {
+          queryParts.push(`or=(title.ilike.*${encodeURIComponent(cleanQ)}*,category.ilike.*${encodeURIComponent(cleanQ)}*,description.ilike.*${encodeURIComponent(cleanQ)}*)`);
+        }
       }
     }
 
     const stylesRes = await supaRest(`studio_styles?${queryParts.join('&')}`);
     const cacheHeaders = !authHeader
-      ? { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' }
+      ? { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120' }
       : { 'Cache-Control': 'private, no-store' };
 
     if (!stylesRes.ok || !Array.isArray(stylesRes.data)) {
       sendJson(res, 200, {
         ok: true,
         styles: [],
+        pinBadges,
         hasMore: false,
         nextOffset: offset,
         limit,
@@ -649,6 +718,7 @@ export async function handleStudioApiRequest(req, res) {
     sendJson(res, 200, {
       ok: true,
       styles,
+      pinBadges,
       hasMore,
       nextOffset: offset + slicedRows.length,
       limit,
@@ -1105,6 +1175,69 @@ export async function handleStudioApiRequest(req, res) {
     }
 
     sendJson(res, 200, { ok: true, deletedId: id });
+    return true;
+  }
+
+  // 8. Assign / Clear Pin Spotlight Badge globally (Strictly yashrajart1999@gmail.com)
+  if (pathname === '/api/pin-badges' && method === 'POST') {
+    if (!auth.isAdmin) {
+      sendJson(res, 403, { ok: false, error: 'Managing spotlight badges is restricted to Studio Admin' });
+      return true;
+    }
+
+    const body = await readJsonBody(req);
+    const pinId = String(body.pinId ?? '').trim();
+    if (!/^[a-zA-Z0-9_-]{1,40}$/.test(pinId)) {
+      sendJson(res, 400, { ok: false, error: 'Valid pinId is required' });
+      return true;
+    }
+
+    const currentMeta = (auth.user.public_metadata && typeof auth.user.public_metadata === 'object')
+      ? { ...auth.user.public_metadata }
+      : {};
+    const nextBadges = compactPinBadgesMap(currentMeta.pinBadges);
+
+    const shouldRemove = Boolean(body.remove) || !String(body.label || '').trim();
+    if (shouldRemove) {
+      delete nextBadges[pinId];
+    } else {
+      const normalized = normalizeSpotlightBadgeEntry({ label: body.label, tone: body.tone });
+      if (!normalized) {
+        sendJson(res, 400, { ok: false, error: 'Valid badge label is required' });
+        return true;
+      }
+      nextBadges[pinId] = normalized;
+    }
+
+    const nextMeta = { ...currentMeta, pinBadges: nextBadges };
+    const clerkPatch = await clerkRequest(
+      `/users/${encodeURIComponent(auth.user.id)}/metadata`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ public_metadata: nextMeta })
+      }
+    );
+
+    if (!clerkPatch.ok) {
+      sendJson(res, 500, { ok: false, error: 'Failed to save spotlight badges in Clerk metadata' });
+      return true;
+    }
+
+    const existingIds = cachedAdminDir.ids instanceof Set ? cachedAdminDir.ids : new Set([auth.user.id]);
+    existingIds.add(auth.user.id);
+    cachedAdminDir = {
+      fetchedAt: Date.now(),
+      ids: existingIds,
+      pinBadges: nextBadges
+    };
+
+    const expandedAll = expandPinBadgesMap(nextBadges);
+    sendJson(res, 200, {
+      ok: true,
+      pinId,
+      badge: expandedAll[pinId] || null,
+      badges: expandedAll
+    });
     return true;
   }
 

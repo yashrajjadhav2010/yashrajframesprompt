@@ -21,8 +21,10 @@ import { initPwaSupport } from './src/lib/pwa.js';
     DEFAULT_AI_APP: 'yashraj_default_ai_app',
     CLIENT_MODE: 'yashraj_client_mode',
     CUSTOM_STYLES: 'yashraj_custom_styles',
+    PIN_BADGES: 'yashraj_pin_badges',
     SHOP_ORDERS: 'yashraj_shop_orders',
-    SHOP_CONTACT: 'yashraj_shop_contact'
+    SHOP_CONTACT: 'yashraj_shop_contact',
+    FEED_LAYOUT: 'yashraj_feed_layout'
   };
 
   function cleanPromptForAi(text) {
@@ -30,6 +32,7 @@ import { initPwaSupport } from './src/lib/pwa.js';
     return String(text)
       .replace(/[\u200B-\u200D\uFEFF]/g, '')
       .replace(/\s*\[cite:\s*[\d,\s]+\]/gi, '')
+      .replace(/\[span_\d+\]\((?:start_span|end_span)\)/gi, '')
       .replace(/\r\n/g, '\n')
       .replace(/[ \t]+/g, ' ')
       .replace(/\n{3,}/g, '\n\n')
@@ -104,9 +107,11 @@ import { initPwaSupport } from './src/lib/pwa.js';
     selectedCategory: 'All',
     searchQuery: '',
     sortBy: 'recent',
+    feedLayout: 'masonry',
     favorites: new Set(),
     recentIds: [],
     customStyles: [],
+    pinBadges: {},
     shopOrders: [],
     ordersFilter: 'all',
     activeModalPin: null,
@@ -122,6 +127,8 @@ import { initPwaSupport } from './src/lib/pwa.js';
       light: 'default',
       engine: 'default'
     },
+    promptVars: {},
+    promptVarsExpanded: true,
     framing: {
       photoUrl: 'assets/prompts/01.jpeg',
       title: 'Royal Cinematic Heritage Portrait',
@@ -193,8 +200,11 @@ import { initPwaSupport } from './src/lib/pwa.js';
     btnClientTryFrame: document.getElementById('btnClientTryFrame'),
 
     // Search
+    pinterestHeader: document.querySelector('.pinterest-header'),
+    headerSearchContainer: document.querySelector('.header-search-container'),
     globalSearchInput: document.getElementById('globalSearchInput'),
     searchClearBtn: document.getElementById('searchClearBtn'),
+    btnMobileSearchCancel: document.getElementById('btnMobileSearchCancel'),
 
     // Header Action Addons
     btnHeaderAddStyle: document.getElementById('btnHeaderAddStyle'),
@@ -295,12 +305,16 @@ import { initPwaSupport } from './src/lib/pwa.js';
     btnResetDefaultAiApp: document.getElementById('btnResetDefaultAiApp'),
     btnTargetNativeShare: document.getElementById('btnTargetNativeShare'),
 
-    // Masonry Grids & Scroll Sentinels
+    // Masonry Grids, View Controls & Scroll Sentinels
     homePinsMasonry: document.getElementById('homePinsMasonry'),
     homeScrollSkeletonGrid: document.getElementById('homeScrollSkeletonGrid'),
     homeFeedSentinel: document.getElementById('homeFeedSentinel'),
     btnHomeLoadMore: document.getElementById('btnHomeLoadMore'),
     lblHomeSentinelStatus: document.getElementById('lblHomeSentinelStatus'),
+    feedLayoutToggle: document.getElementById('feedLayoutToggle'),
+    btnLayoutMasonry: document.getElementById('btnLayoutMasonry'),
+    btnLayoutGrid: document.getElementById('btnLayoutGrid'),
+    feedSortSelect: document.getElementById('feedSortSelect'),
     boardsGridContainer: document.getElementById('boardsGridContainer'),
     savedPinsMasonry: document.getElementById('savedPinsMasonry'),
     savedFeedSentinel: document.getElementById('savedFeedSentinel'),
@@ -325,6 +339,14 @@ import { initPwaSupport } from './src/lib/pwa.js';
     btnModalLightbox: document.getElementById('btnModalLightbox'),
     btnModalFav: document.getElementById('btnModalFav'),
     btnModalShare: document.getElementById('btnModalShare'),
+    pinSharePopover: document.getElementById('pinSharePopover'),
+    btnCloseSharePopover: document.getElementById('btnCloseSharePopover'),
+    inputSharePinUrl: document.getElementById('inputSharePinUrl'),
+    btnShareCopyLink: document.getElementById('btnShareCopyLink'),
+    linkShareWhatsApp: document.getElementById('linkShareWhatsApp'),
+    linkShareTelegram: document.getElementById('linkShareTelegram'),
+    linkShareEmail: document.getElementById('linkShareEmail'),
+    btnShareNativeTrigger: document.getElementById('btnShareNativeTrigger'),
     btnModalDeleteCustom: document.getElementById('btnModalDeleteCustom'),
     btnModalViewInFrame: document.getElementById('btnModalViewInFrame'),
     btnModalAutoTake: document.getElementById('btnModalAutoTake'),
@@ -335,6 +357,14 @@ import { initPwaSupport } from './src/lib/pwa.js';
     btnMobModalCopyPrompt: document.getElementById('btnMobModalCopyPrompt'),
     lblMobModalCopy: document.getElementById('lblMobModalCopy'),
     modalPinTitle: document.getElementById('modalPinTitle'),
+    modalSpotlightBadgeRow: document.getElementById('modalSpotlightBadgeRow'),
+    modalSpotlightBadge: document.getElementById('modalSpotlightBadge'),
+    modalAdminBadgeBar: document.getElementById('modalAdminBadgeBar'),
+    btnModalAdminBadgeClear: document.getElementById('btnModalAdminBadgeClear'),
+    modalAdminBadgePresets: document.getElementById('modalAdminBadgePresets'),
+    txtModalAdminBadgeLabel: document.getElementById('txtModalAdminBadgeLabel'),
+    selModalAdminBadgeTone: document.getElementById('selModalAdminBadgeTone'),
+    btnModalAdminBadgeApply: document.getElementById('btnModalAdminBadgeApply'),
     modalCategoryBadge: document.getElementById('modalCategoryBadge'),
     modalPinDesc: document.getElementById('modalPinDesc'),
     modalTagsContainer: document.getElementById('modalTagsContainer'),
@@ -350,8 +380,17 @@ import { initPwaSupport } from './src/lib/pwa.js';
     modalBeforeImg: document.getElementById('modalBeforeImg'),
     modalSplitDivider: document.getElementById('modalSplitDivider'),
 
-    // Customizer & Subscription Lock Elements
+    // Customizer, Auto-Fill Variables & Subscription Lock Elements
     pinPromptCustomizer: document.getElementById('pinPromptCustomizer'),
+    customizerBody: document.getElementById('customizerBody'),
+    btnToggleCustomizer: document.getElementById('btnToggleCustomizer'),
+    customizerToggleArrow: document.getElementById('customizerToggleArrow'),
+    modalVarsCard: document.getElementById('modalVarsCard'),
+    lblModalVarsBadge: document.getElementById('lblModalVarsBadge'),
+    btnModalVarsClear: document.getElementById('btnModalVarsClear'),
+    btnModalVarsToggle: document.getElementById('btnModalVarsToggle'),
+    modalVarsBody: document.getElementById('modalVarsBody'),
+    modalVarsGrid: document.getElementById('modalVarsGrid'),
     lblModalLockDesc: document.getElementById('lblModalLockDesc'),
     btnModalLockAccount: document.getElementById('btnModalLockAccount'),
     lblModalLockAccountBtn: document.getElementById('lblModalLockAccountBtn'),
@@ -401,6 +440,15 @@ import { initPwaSupport } from './src/lib/pwa.js';
     btnAdminInspPause: document.getElementById('btnAdminInspPause'),
     adminUserSpecificLogs: document.getElementById('adminUserSpecificLogs'),
     adminRecentLogsList: document.getElementById('adminRecentLogsList'),
+    adminBadgeActiveCount: document.getElementById('adminBadgeActiveCount'),
+    adminBadgePinSearch: document.getElementById('adminBadgePinSearch'),
+    adminBadgePinSelect: document.getElementById('adminBadgePinSelect'),
+    adminBadgePresetRow: document.getElementById('adminBadgePresetRow'),
+    txtAdminBadgeLabel: document.getElementById('txtAdminBadgeLabel'),
+    selAdminBadgeTone: document.getElementById('selAdminBadgeTone'),
+    btnAdminApplyPinBadge: document.getElementById('btnAdminApplyPinBadge'),
+    btnAdminClearPinBadge: document.getElementById('btnAdminClearPinBadge'),
+    adminBadgedPinsGrid: document.getElementById('adminBadgedPinsGrid'),
 
     // Framing Studio Elements
     fileCustomerPhotoInput: document.getElementById('fileCustomerPhotoInput'),
@@ -507,6 +555,10 @@ import { initPwaSupport } from './src/lib/pwa.js';
     txtNewStylePrompt: document.getElementById('txtNewStylePrompt'),
     txtNewStyleDescription: document.getElementById('txtNewStyleDescription'),
     txtNewStyleTags: document.getElementById('txtNewStyleTags'),
+    selNewStyleBadgePreset: document.getElementById('selNewStyleBadgePreset'),
+    newStyleCustomBadgeGroup: document.getElementById('newStyleCustomBadgeGroup'),
+    txtNewStyleBadgeCustom: document.getElementById('txtNewStyleBadgeCustom'),
+    selNewStyleBadgeTone: document.getElementById('selNewStyleBadgeTone'),
     btnSaveCustomStyle: document.getElementById('btnSaveCustomStyle'),
     btnExportCustomStyles: document.getElementById('btnExportCustomStyles'),
     fileImportStylesJson: document.getElementById('fileImportStylesJson'),
@@ -554,8 +606,14 @@ import { initPwaSupport } from './src/lib/pwa.js';
       }
       const cs = localStorage.getItem(STORAGE_KEYS.CUSTOM_STYLES);
       if (cs) state.customStyles = JSON.parse(cs);
+      const pb = localStorage.getItem(STORAGE_KEYS.PIN_BADGES);
+      if (pb) state.pinBadges = normalizePinBadgesMap(JSON.parse(pb));
       const so = localStorage.getItem(STORAGE_KEYS.SHOP_ORDERS);
       if (so) state.shopOrders = JSON.parse(so);
+      const savedLayout = localStorage.getItem(STORAGE_KEYS.FEED_LAYOUT);
+      if (savedLayout === 'grid' || savedLayout === 'masonry') {
+        state.feedLayout = savedLayout;
+      }
       updateOrdersBadge();
     } catch (e) {
       console.warn('LocalStorage error', e);
@@ -563,8 +621,124 @@ import { initPwaSupport } from './src/lib/pwa.js';
       state.recentIds = [];
       state.defaultAiApp = null;
       state.customStyles = [];
+      state.pinBadges = {};
       state.shopOrders = [];
     }
+  }
+
+  const VALID_SPOTLIGHT_TONES = new Set(['amazon', 'flipkart', 'crimson', 'gold', 'emerald', 'violet']);
+
+  function normalizePinBadgeEntry(entry) {
+    if (!entry || typeof entry !== 'object') return null;
+    const rawLabel = typeof entry.label === 'string'
+      ? entry.label
+      : (typeof entry.l === 'string' ? entry.l : '');
+    const label = rawLabel.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    if (!label) return null;
+    const rawTone = String(entry.tone || entry.t || 'crimson').trim().toLowerCase();
+    const tone = VALID_SPOTLIGHT_TONES.has(rawTone) ? rawTone : 'crimson';
+    return { label, tone };
+  }
+
+  function normalizePinBadgesMap(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const next = {};
+    Object.keys(raw).forEach((key) => {
+      const cleanId = String(key || '').trim();
+      if (!cleanId) return;
+      const entry = normalizePinBadgeEntry(raw[key]);
+      if (entry) next[cleanId] = entry;
+    });
+    return next;
+  }
+
+  function getPinSpotlightBadge(pinId) {
+    if (pinId === undefined || pinId === null) return null;
+    return state.pinBadges[String(pinId)] || null;
+  }
+
+  function savePinBadgesToLocal() {
+    try {
+      localStorage.setItem(STORAGE_KEYS.PIN_BADGES, JSON.stringify(state.pinBadges));
+    } catch (e) {
+      console.warn('Unable to save pin badges', e);
+    }
+  }
+
+  function applyServerPinBadges(badgesMap) {
+    if (!badgesMap || typeof badgesMap !== 'object') return;
+    state.pinBadges = normalizePinBadgesMap(badgesMap);
+    savePinBadgesToLocal();
+    if (state.activeModalPin) {
+      updateModalSpotlightBadgeUI(state.activeModalPin);
+    }
+    if (state.currentView === 'admin' && isAdminUser()) {
+      renderAdminPinBadgesManager();
+    } else if (['home', 'saved', 'history'].includes(state.currentView)) {
+      refreshCurrentView();
+    }
+  }
+
+  async function saveAdminPinSpotlightBadge({ pinId, label = '', tone = 'crimson', remove = false } = {}) {
+    if (!isAdminUser()) {
+      showToast('Spotlight badges are restricted to Studio Admin');
+      return { ok: false };
+    }
+    const key = String(pinId ?? '').trim();
+    if (!key) return { ok: false };
+
+    const normalized = remove ? null : normalizePinBadgeEntry({ label, tone });
+    if (!remove && !normalized) {
+      showToast('Enter a spotlight tag label (e.g. Best Seller, Trending)');
+      return { ok: false };
+    }
+
+    const prevMap = { ...state.pinBadges };
+    if (remove || !normalized) {
+      delete state.pinBadges[key];
+    } else {
+      state.pinBadges[key] = normalized;
+    }
+    savePinBadgesToLocal();
+
+    if (state.activeModalPin && String(state.activeModalPin.id) === key) {
+      updateModalSpotlightBadgeUI(state.activeModalPin);
+    }
+    if (state.currentView === 'admin') {
+      renderAdminPinBadgesManager();
+    } else {
+      refreshCurrentView();
+    }
+
+    if (typeof cloudSync !== 'undefined' && cloudSync.user) {
+      const res = await cloudSync.savePinBadge({
+        pinId: key,
+        label: normalized ? normalized.label : '',
+        tone: normalized ? normalized.tone : 'crimson',
+        remove: Boolean(remove || !normalized)
+      });
+      if (!res.ok) {
+        state.pinBadges = prevMap;
+        savePinBadgesToLocal();
+        if (state.activeModalPin && String(state.activeModalPin.id) === key) {
+          updateModalSpotlightBadgeUI(state.activeModalPin);
+        }
+        if (state.currentView === 'admin') renderAdminPinBadgesManager();
+        else refreshCurrentView();
+        showToast(res.error || 'Failed to save spotlight tag globally');
+        return { ok: false };
+      }
+      if (res.badges) {
+        state.pinBadges = normalizePinBadgesMap(res.badges);
+        savePinBadgesToLocal();
+      }
+      state.cloudStyles.page0Cache.clear();
+      showToast(normalized ? `Applied "${normalized.label}" badge across studio!` : 'Removed spotlight badge');
+      return { ok: true };
+    }
+
+    showToast(normalized ? `Applied "${normalized.label}" badge locally` : 'Removed spotlight badge locally');
+    return { ok: true };
   }
 
   function saveCustomStyles() {
@@ -804,6 +978,204 @@ import { initPwaSupport } from './src/lib/pwa.js';
       if (notify) showToast('Unable to copy to clipboard');
       return false;
     }
+  }
+
+  // ==========================================================================
+  // PIN SHARING & DEEP-LINK ROUTING (?pin=<id> / #pin=<id>)
+  // ==========================================================================
+  async function copyPlainTextToClipboard(text) {
+    const val = String(text || '');
+    if (!val) return false;
+    try {
+      if (navigator.clipboard && window.isSecureContext && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(val);
+        return true;
+      }
+    } catch {
+      // Fallback below
+    }
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = val;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '0';
+      textarea.style.left = '0';
+      textarea.style.width = '1px';
+      textarea.style.height = '1px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus({ preventScroll: true });
+      textarea.select();
+      textarea.setSelectionRange(0, val.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return Boolean(ok);
+    } catch {
+      return false;
+    }
+  }
+
+  function buildPinShareUrl(pin) {
+    if (!pin) return window.location.href;
+    const url = new URL(window.location.origin + window.location.pathname);
+    url.searchParams.set('pin', String(pin.id));
+    return url.toString();
+  }
+
+  function getPinIdFromUrl() {
+    try {
+      const searchParams = new URLSearchParams(window.location.search || '');
+      const fromQuery = searchParams.get('pin');
+      if (fromQuery && fromQuery.trim()) return fromQuery.trim();
+    } catch {
+      // ignore invalid search
+    }
+    const hash = String(window.location.hash || '');
+    const m = hash.match(/^#pin(?:\/|=)([^&/?#]+)/i);
+    return m && m[1] ? decodeURIComponent(m[1]).trim() : '';
+  }
+
+  function syncPinQueryInUrl(pinId) {
+    if (!pinId) return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('pin', String(pinId));
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+    } catch {
+      // ignore
+    }
+  }
+
+  function clearPinQueryFromUrl() {
+    try {
+      const url = new URL(window.location.href);
+      let changed = false;
+      if (url.searchParams.has('pin')) {
+        url.searchParams.delete('pin');
+        changed = true;
+      }
+      if (/^#pin(?:\/|=)/i.test(url.hash || '')) {
+        url.hash = '#home';
+        changed = true;
+      }
+      if (changed) {
+        window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  function closePinSharePopover() {
+    if (dom.pinSharePopover) {
+      dom.pinSharePopover.style.display = 'none';
+    }
+    if (dom.btnModalShare) {
+      dom.btnModalShare.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function populatePinSharePopover(pin, shareUrl) {
+    if (!pin) return;
+    const url = shareUrl || buildPinShareUrl(pin);
+    const title = String(pin.title || 'Studio Style').trim();
+    const category = String(pin.category || 'Portrait').trim();
+    const shareMsg = `Check out "${title}" (${category}) on Yashraj Frames AI Studio:\n${url}`;
+
+    if (dom.inputSharePinUrl) {
+      dom.inputSharePinUrl.value = url;
+    }
+    if (dom.btnShareCopyLink) {
+      dom.btnShareCopyLink.textContent = 'Copy';
+      dom.btnShareCopyLink.classList.remove('copied');
+    }
+    if (dom.linkShareWhatsApp) {
+      dom.linkShareWhatsApp.href = `https://wa.me/?text=${encodeURIComponent(shareMsg)}`;
+    }
+    if (dom.linkShareTelegram) {
+      dom.linkShareTelegram.href = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(`${title} — Yashraj Frames AI Studio`)}`;
+    }
+    if (dom.linkShareEmail) {
+      const subject = `${title} — Yashraj Frames Studio`;
+      dom.linkShareEmail.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(shareMsg)}`;
+    }
+    if (dom.btnShareNativeTrigger) {
+      dom.btnShareNativeTrigger.style.display = typeof navigator.share === 'function' ? 'inline-flex' : 'none';
+    }
+  }
+
+  function openPinSharePopover(pin, shareUrl) {
+    if (!dom.pinSharePopover || !pin) return;
+    populatePinSharePopover(pin, shareUrl);
+    dom.pinSharePopover.style.display = 'flex';
+    if (dom.btnModalShare) {
+      dom.btnModalShare.setAttribute('aria-expanded', 'true');
+    }
+  }
+
+  async function handleShareActivePin() {
+    const pin = state.activeModalPin;
+    if (!pin) return;
+
+    if (dom.pinSharePopover && dom.pinSharePopover.style.display !== 'none') {
+      closePinSharePopover();
+      return;
+    }
+
+    const shareUrl = buildPinShareUrl(pin);
+    const copied = await copyPlainTextToClipboard(shareUrl);
+
+    if (isMobileDevice() && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: `${pin.title || 'Studio Style'} — Yashraj Frames Studio`,
+          text: `Check out "${pin.title || 'this portrait style'}" (${pin.category || 'Studio Preset'}) on Yashraj Frames AI Studio`,
+          url: shareUrl
+        });
+        showToast('Style shared!');
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        // Fall through to popover if Web Share failed (e.g. iframe restriction)
+      }
+    }
+
+    openPinSharePopover(pin, shareUrl);
+    if (dom.btnShareCopyLink && copied) {
+      dom.btnShareCopyLink.textContent = 'Copied';
+      dom.btnShareCopyLink.classList.add('copied');
+      setTimeout(() => {
+        if (dom.btnShareCopyLink) {
+          dom.btnShareCopyLink.textContent = 'Copy';
+          dom.btnShareCopyLink.classList.remove('copied');
+        }
+      }, 1800);
+    }
+    showToast(copied ? 'Pin link copied to clipboard!' : 'Share menu opened');
+  }
+
+  async function openPinByDeepLink(rawPinId) {
+    const targetId = String(rawPinId || '').trim();
+    if (!targetId) return false;
+
+    let pin = getAllPrompts().find(p => String(p.id) === targetId) || null;
+    if (!pin && typeof cloudSync !== 'undefined' && typeof cloudSync.fetchSharedStyleById === 'function') {
+      const fetched = await cloudSync.fetchSharedStyleById(targetId);
+      if (fetched) {
+        state.customStyles = mergeStylesById(state.customStyles, [fetched], { replaceRemote: false });
+        pin = fetched;
+      }
+    }
+
+    if (!pin) {
+      showToast('Shared pin not found or no longer available');
+      clearPinQueryFromUrl();
+      return false;
+    }
+
+    openPinModal(pin.id);
+    return true;
   }
 
   // ==========================================================================
@@ -1263,6 +1635,10 @@ import { initPwaSupport } from './src/lib/pwa.js';
         return { ok: false, added: 0 };
       }
 
+      if (res.pinBadges) {
+        applyServerPinBadges(res.pinBadges);
+      }
+
       if (reset && !append && queryKey === 'All||') {
         state.customStyles = mergeStylesById(state.customStyles, res.styles, { replaceRemote: true });
         saveCustomStyles();
@@ -1309,6 +1685,9 @@ import { initPwaSupport } from './src/lib/pwa.js';
   const cloudSync = new StudioCloudSync({
     onAuthChange: ({ user }) => {
       updateAccountAndSubscriptionUI();
+      if (state.activeModalPin) {
+        updateModalSpotlightBadgeUI(state.activeModalPin);
+      }
       if (!user) {
         state.cloudStyles.page0Cache.clear();
         void loadSharedStudioStyles({ reset: true });
@@ -1322,7 +1701,10 @@ import { initPwaSupport } from './src/lib/pwa.js';
       closeClerkAuthModal();
       showToast('Signed in & syncing with studio cloud');
     },
-    onCloudBootstrap: async ({ styles, stylesPageMeta, orders, preferences }) => {
+    onCloudBootstrap: async ({ styles, pinBadges, stylesPageMeta, orders, preferences }) => {
+      if (pinBadges) {
+        applyServerPinBadges(pinBadges);
+      }
       // Shared Admin-published studio styles (page 0 fetched on boot; additional pages load on scroll)
       if (Array.isArray(styles)) {
         if (isAdminUser()) {
@@ -2524,6 +2906,7 @@ Thank you for trusting us with your precious memories!`;
     }
     if (!dom.addStyleModal) return;
     if (dom.addStyleForm) dom.addStyleForm.reset();
+    if (dom.newStyleCustomBadgeGroup) dom.newStyleCustomBadgeGroup.style.display = 'none';
     if (dom.newStyleImagePreviewContainer) dom.newStyleImagePreviewContainer.style.display = 'none';
     if (dom.newStyleImagePreview) dom.newStyleImagePreview.src = '';
     dom.addStyleModal.classList.add('active');
@@ -2549,6 +2932,18 @@ Thank you for trusting us with your precious memories!`;
     const desc = dom.txtNewStyleDescription ? dom.txtNewStyleDescription.value.trim() : '';
     const tagsRaw = dom.txtNewStyleTags ? dom.txtNewStyleTags.value.trim() : '';
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [category.toLowerCase()];
+
+    let initialBadge = null;
+    const presetBadgeVal = dom.selNewStyleBadgePreset ? dom.selNewStyleBadgePreset.value : '';
+    if (presetBadgeVal === '__custom__') {
+      initialBadge = normalizePinBadgeEntry({
+        label: dom.txtNewStyleBadgeCustom ? dom.txtNewStyleBadgeCustom.value : '',
+        tone: dom.selNewStyleBadgeTone ? dom.selNewStyleBadgeTone.value : 'amazon'
+      });
+    } else if (presetBadgeVal && presetBadgeVal.includes('|')) {
+      const [bLabel, bTone] = presetBadgeVal.split('|');
+      initialBadge = normalizePinBadgeEntry({ label: bLabel, tone: bTone });
+    }
 
     let image = 'assets/prompts/01.jpeg';
     if (dom.newStyleImagePreview && dom.newStyleImagePreview.src && dom.newStyleImagePreview.src.startsWith('data:')) {
@@ -2592,11 +2987,22 @@ Thank you for trusting us with your precious memories!`;
 
     state.customStyles.unshift(newStyle);
     saveCustomStyles();
+    if (initialBadge) {
+      state.pinBadges[String(uniqueNumericId)] = initialBadge;
+      savePinBadgesToLocal();
+    }
     closeAddStyleModal();
     refreshCurrentView();
 
     if (cloudSync.user) {
       const res = await cloudSync.upsertStyle(newStyle);
+      if (initialBadge) {
+        await cloudSync.savePinBadge({
+          pinId: uniqueNumericId,
+          label: initialBadge.label,
+          tone: initialBadge.tone
+        });
+      }
       showToast(res.synced ? `Published "${title}" to all studio users!` : `Saved "${title}" locally (cloud sync retry queued)`);
     } else {
       showToast(`Saved "${title}" locally! Sign in to publish across all users.`);
@@ -2860,15 +3266,427 @@ Looking forward to welcoming you! Thank you.`);
   }
 
   // ==========================================================================
-  // SMART PROMPT MIXER / CUSTOMIZER
+  // AUTO-FILL PROMPT PLACEHOLDERS + SMART PROMPT MIXER
   // ==========================================================================
-  function getCustomizedPrompt(pin) {
-    if (!pin) return '';
-    let p = pin.prompt;
+  function detectPromptPlaceholders(rawPrompt) {
+    const clean = cleanPromptForAi(rawPrompt || '');
+    const fields = [];
+    const matchedPatterns = [];
+
+    const hasYourName = /\[YOUR\s+NAME\]|\bYOUR\s+NAME\b|\[NAME\s*1\]|\[NAME\]/i.test(clean);
+    const hasName2 = /\[NAME\s*2\]|\[PARTNER\s+NAME\]/i.test(clean);
+    const hasLastName = /\[YOUR\s+LAST\s+NAME\]|\[LAST\s+NAME\]|\bYOUR\s+LAST\s+NAME\b/i.test(clean);
+    const hasDateBracket = /\[DATE\]|\[BIRTH\s*DATE\]/i.test(clean);
+    const hasYearToken = /year\s+indicator\s+"2003"|\[YEAR\]|\[BIRTH\s*YEAR\]/i.test(clean);
+    const hasMonthToken = /month\s+number\s+"04"|\[MONTH\]|\[DAY\]/i.test(clean);
+    const hasAgeToken = /\[AGE\]|\[MILESTONE\]|"\d+(?:ST|ND|RD|TH)\s+BIRTHDAY"|number\s+"1"\s+shaped/i.test(clean);
+    const mentionsNameProse = /\b(?:name\s+and\s+date|custom\s+name)\b/i.test(clean);
+
+    if (hasYourName || mentionsNameProse) {
+      fields.push({
+        key: 'name1',
+        label: hasName2 ? 'First Partner Name' : 'Subject Name',
+        tokenHint: hasName2 ? '[NAME 1]' : (clean.includes('[YOUR NAME]') ? '[YOUR NAME]' : (hasYourName ? 'YOUR NAME' : 'Name')),
+        placeholder: hasName2 ? 'e.g., Aarav' : 'e.g., Rohan / Divya',
+        detected: true
+      });
+      if (hasYourName) {
+        matchedPatterns.push(/\[YOUR\s+NAME\]/gi, /\bYOUR\s+NAME\b/gi, /\[NAME\s*1\]/gi, /\[NAME\]/gi);
+      }
+    }
+
+    if (hasLastName) {
+      fields.push({
+        key: 'lastName',
+        label: 'Last Name / Signature',
+        tokenHint: '[YOUR LAST NAME]',
+        placeholder: 'e.g., Sharma',
+        detected: true
+      });
+      matchedPatterns.push(/\[YOUR\s+LAST\s+NAME\]/gi, /\[LAST\s+NAME\]/gi, /\bYOUR\s+LAST\s+NAME\b/gi);
+    }
+
+    if (hasName2) {
+      fields.push({
+        key: 'name2',
+        label: 'Second Partner Name',
+        tokenHint: '[NAME 2]',
+        placeholder: 'e.g., Meera',
+        detected: true
+      });
+      matchedPatterns.push(/\[NAME\s*2\]/gi, /\[PARTNER\s+NAME\]/gi);
+    }
+
+    if (hasDateBracket || hasYearToken || mentionsNameProse) {
+      fields.push({
+        key: 'dateOrYear',
+        label: hasYearToken && !hasDateBracket ? 'Birth Year' : 'Date / Birth Year',
+        tokenHint: hasDateBracket ? '[DATE]' : (hasYearToken ? '"2003"' : 'Date'),
+        placeholder: hasYearToken && !hasDateBracket ? 'e.g., 2001' : 'e.g., 14 Feb 2026',
+        detected: true
+      });
+      if (hasDateBracket) matchedPatterns.push(/\[DATE\]/gi, /\[BIRTH\s*DATE\]/gi);
+      if (hasYearToken) matchedPatterns.push(/year\s+indicator\s+"2003"/gi, /\[YEAR\]/gi, /\[BIRTH\s*YEAR\]/gi);
+    }
+
+    if (hasMonthToken) {
+      fields.push({
+        key: 'monthOrDay',
+        label: 'Month / Day',
+        tokenHint: 'Month "04"',
+        placeholder: 'e.g., 08 or 15 Aug',
+        detected: true
+      });
+      matchedPatterns.push(/month\s+number\s+"04"/gi, /\[MONTH\]/gi, /\[DAY\]/gi);
+    }
+
+    if (hasAgeToken) {
+      fields.push({
+        key: 'age',
+        label: 'Age / Milestone',
+        tokenHint: 'Milestone',
+        placeholder: 'e.g., 5th or 25',
+        detected: true
+      });
+      matchedPatterns.push(/\[AGE\]/gi, /\[MILESTONE\]/gi, /"\d+(?:ST|ND|RD|TH)\s+BIRTHDAY"/gi);
+    }
+
+    // Discover any extra custom uppercase [TOKEN] placeholders in Admin styles
+    const bracketMatches = clean.match(/\[[A-Z0-9 _-]{2,28}\]/g) || [];
+    const handledBrackets = new Set([
+      '[YOUR NAME]', '[YOUR LAST NAME]', '[LAST NAME]', '[NAME 1]', '[NAME 2]', '[NAME]',
+      '[PARTNER NAME]', '[DATE]', '[BIRTH DATE]', '[YEAR]', '[BIRTH YEAR]', '[MONTH]',
+      '[DAY]', '[AGE]', '[MILESTONE]', '[CUSTOM TEXT]', '[SUBTITLE]'
+    ]);
+    const seenExtra = new Set();
+    for (const token of bracketMatches) {
+      const upper = token.toUpperCase();
+      if (handledBrackets.has(upper) || seenExtra.has(upper)) continue;
+      seenExtra.add(upper);
+      const slug = `extra_${upper.replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase()}`;
+      const pretty = upper.slice(1, -1).toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+      fields.push({
+        key: slug,
+        label: pretty,
+        tokenHint: token,
+        placeholder: `Enter ${pretty}...`,
+        rawToken: token,
+        detected: true
+      });
+    }
+
+    const detectedCount = fields.length;
+
+    // Ensure common fields exist even on general styles when user wants quick personalization
+    if (!fields.some(f => f.key === 'name1')) {
+      fields.push({
+        key: 'name1',
+        label: 'Subject Name (Optional)',
+        tokenHint: 'Appends',
+        placeholder: 'e.g., Aarav',
+        detected: false
+      });
+    }
+    if (!fields.some(f => f.key === 'dateOrYear')) {
+      fields.push({
+        key: 'dateOrYear',
+        label: 'Date / Year (Optional)',
+        tokenHint: 'Appends',
+        placeholder: 'e.g., 14 Feb 2026',
+        detected: false
+      });
+    }
+    if (!fields.some(f => f.key === 'age')) {
+      fields.push({
+        key: 'age',
+        label: 'Age (Optional)',
+        tokenHint: 'Appends',
+        placeholder: 'e.g., 25th',
+        detected: false
+      });
+    }
+    fields.push({
+      key: 'customText',
+      label: 'Custom Text / Subtitle',
+      tokenHint: '[CUSTOM TEXT]',
+      placeholder: 'Optional poster headline, wish, or tagline...',
+      fullWidth: true,
+      detected: /\[CUSTOM\s*TEXT\]|\[SUBTITLE\]/i.test(clean)
+    });
+
+    return {
+      fields,
+      detectedCount,
+      hasDetectedPlaceholders: detectedCount > 0,
+      matchedPatterns
+    };
+  }
+
+  function formatAgeOrdinal(rawVal) {
+    const trimmed = String(rawVal || '').trim();
+    if (!/^\d+$/.test(trimmed)) return trimmed.toUpperCase();
+    const num = Number(trimmed);
+    const mod100 = num % 100;
+    if (mod100 >= 11 && mod100 <= 13) return `${num}TH`;
+    const mod10 = num % 10;
+    if (mod10 === 1) return `${num}ST`;
+    if (mod10 === 2) return `${num}ND`;
+    if (mod10 === 3) return `${num}RD`;
+    return `${num}TH`;
+  }
+
+  function applyPromptVariablesToText(rawPrompt, vars = {}, meta = null) {
+    let p = cleanPromptForAi(rawPrompt || '');
+    const parsedMeta = meta || detectPromptPlaceholders(p);
+    const activeReplacements = [];
+    const extraLines = [];
+
+    const name1 = String(vars.name1 || '').trim();
+    const lastName = String(vars.lastName || '').trim();
+    const name2 = String(vars.name2 || '').trim();
+    const dateOrYear = String(vars.dateOrYear || '').trim();
+    const monthOrDay = String(vars.monthOrDay || '').trim();
+    const age = String(vars.age || '').trim();
+    const customText = String(vars.customText || '').trim();
+
+    if (name1) {
+      let replaced = false;
+      const reList = [/\[YOUR\s+NAME\]/gi, /\bYOUR\s+NAME\b/gi, /\[NAME\s*1\]/gi, /\[NAME\]/gi];
+      for (const re of reList) {
+        if (re.test(p)) {
+          p = p.replace(re, name1);
+          replaced = true;
+        }
+      }
+      if (replaced) activeReplacements.push(name1);
+      else extraLines.push(`Subject Name: "${name1}"`);
+    }
+
+    if (lastName) {
+      let replaced = false;
+      const reList = [/\[YOUR\s+LAST\s+NAME\]/gi, /\[LAST\s+NAME\]/gi, /\bYOUR\s+LAST\s+NAME\b/gi];
+      for (const re of reList) {
+        if (re.test(p)) {
+          p = p.replace(re, lastName);
+          replaced = true;
+        }
+      }
+      if (replaced) activeReplacements.push(lastName);
+      else extraLines.push(`Last Name: "${lastName}"`);
+    }
+
+    if (name2) {
+      let replaced = false;
+      const reList = [/\[NAME\s*2\]/gi, /\[PARTNER\s+NAME\]/gi];
+      for (const re of reList) {
+        if (re.test(p)) {
+          p = p.replace(re, name2);
+          replaced = true;
+        }
+      }
+      if (replaced) activeReplacements.push(name2);
+      else extraLines.push(`Partner Name: "${name2}"`);
+    }
+
+    if (dateOrYear) {
+      let replaced = false;
+      if (/\[DATE\]|\[BIRTH\s*DATE\]|\[YEAR\]|\[BIRTH\s*YEAR\]/i.test(p)) {
+        p = p.replace(/\[DATE\]|\[BIRTH\s*DATE\]|\[YEAR\]|\[BIRTH\s*YEAR\]/gi, dateOrYear);
+        replaced = true;
+      }
+      if (/year\s+indicator\s+"2003"/i.test(p)) {
+        p = p.replace(/(year\s+indicator\s+)"2003"/gi, `$1"${dateOrYear}"`);
+        replaced = true;
+      }
+      if (replaced) activeReplacements.push(dateOrYear);
+      else extraLines.push(`Date / Year: "${dateOrYear}"`);
+    }
+
+    if (monthOrDay) {
+      let replaced = false;
+      if (/month\s+number\s+"04"/i.test(p)) {
+        p = p.replace(/(month\s+number\s+)"04"/gi, `$1"${monthOrDay}"`);
+        replaced = true;
+      }
+      if (/\[MONTH\]|\[DAY\]/i.test(p)) {
+        p = p.replace(/\[MONTH\]|\[DAY\]/gi, monthOrDay);
+        replaced = true;
+      }
+      if (replaced) activeReplacements.push(monthOrDay);
+      else extraLines.push(`Month / Day: "${monthOrDay}"`);
+    }
+
+    if (age) {
+      let replaced = false;
+      if (/\[AGE\]|\[MILESTONE\]/i.test(p)) {
+        p = p.replace(/\[AGE\]|\[MILESTONE\]/gi, age);
+        replaced = true;
+      }
+      if (/"\d+(?:ST|ND|RD|TH)\s+BIRTHDAY"/i.test(p)) {
+        const ord = formatAgeOrdinal(age);
+        p = p.replace(/"\d+(?:ST|ND|RD|TH)\s+BIRTHDAY"/gi, `"${ord} BIRTHDAY"`);
+        replaced = true;
+        activeReplacements.push(`${ord} BIRTHDAY`);
+      } else if (/number\s+"1"\s+shaped/i.test(p)) {
+        const numOnly = age.replace(/[^\d]/g, '') || age;
+        p = p.replace(/(number\s+)"1"(\s+shaped)/gi, `$1"${numOnly}"$2`);
+        replaced = true;
+        activeReplacements.push(`"${numOnly}"`);
+      } else if (replaced) {
+        activeReplacements.push(age);
+      }
+      if (!replaced) extraLines.push(`Age / Milestone: "${age}"`);
+    }
+
+    for (const field of parsedMeta.fields) {
+      if (!field.rawToken) continue;
+      const val = String(vars[field.key] || '').trim();
+      if (!val) continue;
+      const escaped = field.rawToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(escaped, 'gi');
+      if (re.test(p)) {
+        p = p.replace(re, val);
+        activeReplacements.push(val);
+      }
+    }
+
+    if (customText) {
+      let replaced = false;
+      if (/\[CUSTOM\s*TEXT\]|\[SUBTITLE\]/i.test(p)) {
+        p = p.replace(/\[CUSTOM\s*TEXT\]|\[SUBTITLE\]/gi, customText);
+        replaced = true;
+      }
+      if (replaced) activeReplacements.push(customText);
+      else extraLines.push(`Custom Typography / Text: "${customText}"`);
+    }
+
+    if (extraLines.length > 0) {
+      const note = `[Client Personalization — ${extraLines.join(' · ')}]`;
+      p += `\n${note}`;
+      activeReplacements.push(note);
+    }
+
+    return { text: p, activeReplacements };
+  }
+
+  function renderHighlightedPromptPreview(el, plainPrompt, activeReplacements = []) {
+    if (!el) return;
+    const text = String(plainPrompt || '');
+    const spans = [];
+
+    const uniqueFilled = Array.from(new Set((activeReplacements || []).filter(Boolean)))
+      .sort((a, b) => b.length - a.length);
+
+    for (const val of uniqueFilled) {
+      const escapedVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (!escapedVal) continue;
+      const prefix = /^\w/.test(val) ? '(?<![A-Za-z0-9_])' : '';
+      const suffix = /\w$/.test(val) ? '(?![A-Za-z0-9_])' : '';
+      const re = new RegExp(`${prefix}${escapedVal}${suffix}`, 'g');
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        if (m[0].length === 0) break;
+        spans.push({ start: m.index, end: m.index + m[0].length, kind: 'filled', priority: 2 });
+      }
+    }
+
+    const pendingTokenPatterns = [
+      /\[(?:YOUR\s+NAME|YOUR\s+LAST\s+NAME|LAST\s+NAME|NAME\s*1|NAME\s*2|NAME|PARTNER\s+NAME|DATE|BIRTH\s*DATE|YEAR|BIRTH\s*YEAR|MONTH|DAY|AGE|MILESTONE|CUSTOM\s*TEXT|SUBTITLE)\]/gi,
+      /\[[A-Z0-9][A-Z0-9 _-]{1,26}[A-Z0-9]\]/g,
+      /\bYOUR\s+NAME\b/gi,
+      /\bYOUR\s+LAST\s+NAME\b/gi
+    ];
+    for (const re of pendingTokenPatterns) {
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        if (m[0].length === 0) break;
+        spans.push({ start: m.index, end: m.index + m[0].length, kind: 'pending', priority: 1 });
+      }
+    }
+
+    spans.sort((a, b) => a.start - b.start || b.priority - a.priority || (b.end - b.start) - (a.end - a.start));
+
+    let html = '';
+    let cursor = 0;
+    for (const seg of spans) {
+      if (seg.start < cursor) continue;
+      if (seg.start > cursor) {
+        html += escapeHtml(text.slice(cursor, seg.start));
+      }
+      const cls = seg.kind === 'filled' ? 'prompt-token-filled' : 'prompt-token-pending';
+      html += `<span class="${cls}">${escapeHtml(text.slice(seg.start, seg.end))}</span>`;
+      cursor = seg.end;
+    }
+    if (cursor < text.length) {
+      html += escapeHtml(text.slice(cursor));
+    }
+
+    el.innerHTML = html;
+  }
+
+  function syncPromptVarsCardUI(meta) {
+    if (!dom.modalVarsCard || !dom.modalVarsBody || !dom.btnModalVarsToggle || !dom.lblModalVarsBadge) return;
+    const isExpanded = Boolean(state.promptVarsExpanded);
+    dom.modalVarsBody.style.display = isExpanded ? 'block' : 'none';
+    dom.btnModalVarsToggle.textContent = isExpanded ? 'Hide' : 'Personalize';
+    dom.btnModalVarsToggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+
+    const filledCount = Object.values(state.promptVars || {}).filter(v => String(v || '').trim().length > 0).length;
+    if (filledCount > 0) {
+      dom.lblModalVarsBadge.textContent = `${filledCount} field${filledCount === 1 ? '' : 's'} applied`;
+    } else if (meta && meta.hasDetectedPlaceholders) {
+      dom.lblModalVarsBadge.textContent = `${meta.detectedCount} placeholder${meta.detectedCount === 1 ? '' : 's'} detected`;
+    } else {
+      dom.lblModalVarsBadge.textContent = 'Optional client text';
+    }
+    if (dom.btnModalVarsClear) {
+      dom.btnModalVarsClear.style.display = filledCount > 0 ? 'inline-flex' : 'none';
+    }
+  }
+
+  function renderPromptVarsPanel(pin) {
+    if (!dom.modalVarsCard || !dom.modalVarsGrid || !pin) return;
+    const meta = detectPromptPlaceholders(pin.prompt);
+    state.promptVarsExpanded = meta.hasDetectedPlaceholders;
+
+    dom.modalVarsGrid.innerHTML = meta.fields.map(field => {
+      const val = state.promptVars[field.key] || '';
+      return `
+        <div class="modal-var-field ${field.fullWidth ? 'is-full' : ''}">
+          <div class="modal-var-label-row">
+            <label class="modal-var-label" for="modalVar_${escapeHtml(field.key)}">${escapeHtml(field.label)}</label>
+            <span class="modal-var-tag">${escapeHtml(field.tokenHint)}</span>
+          </div>
+          <input
+            type="text"
+            id="modalVar_${escapeHtml(field.key)}"
+            class="modal-var-input ${val.trim() ? 'has-value' : ''}"
+            data-var-key="${escapeHtml(field.key)}"
+            placeholder="${escapeHtml(field.placeholder)}"
+            value="${escapeHtml(val)}"
+            autocomplete="off"
+          />
+        </div>
+      `;
+    }).join('');
+
+    syncPromptVarsCardUI(meta);
+  }
+
+  function getCustomizedPromptResult(pin) {
+    if (!pin) return { text: '', activeReplacements: [] };
+    const { text: baseWithVars, activeReplacements } = applyPromptVariablesToText(pin.prompt, state.promptVars);
+    let p = baseWithVars;
     const { subject, ratio, light, engine } = state.customizer;
 
-    if (subject === 'bride-groom') {
+    if (subject === 'bride-groom' || subject === 'couple') {
       p = `[Subject Focus: Indian Bride & Groom couple in traditional wedding attire] ` + p;
+    } else if (subject === 'bride') {
+      p = `[Subject Focus: Indian bridal portrait in traditional embroidered lehenga & heritage jewelry] ` + p;
+    } else if (subject === 'groom') {
+      p = `[Subject Focus: Royal Indian groom portrait in tailored sherwani styling] ` + p;
+    } else if (subject === 'grandparents') {
+      p = `[Subject Focus: Dignified elder family portrait with warm respectful lighting] ` + p;
     } else if (subject === 'solo-portrait') {
       p = `[Subject Focus: Close-up solo artistic portrait, intense eye contact] ` + p;
     } else if (subject === 'family') {
@@ -2879,7 +3697,9 @@ Looking forward to welcoming you! Thank you.`);
 
     if (light === 'sunset') {
       p += `\n[Lighting: Golden hour warm amber sunset backlighting, atmospheric volumetric dust motes]`;
-    } else if (light === 'rembrandt') {
+    } else if (light === 'royal-gold') {
+      p += `\n[Lighting: Warm studio key light with rich royal champagne-gold highlights]`;
+    } else if (light === 'chiaroscuro' || light === 'rembrandt') {
       p += `\n[Lighting: Rembrandt directional studio spotlight, cinematic chiaroscuro shadows]`;
     } else if (light === 'rim') {
       p += `\n[Lighting: High-contrast dramatic rim lighting highlighting silhouettes, dark moody background]`;
@@ -2888,25 +3708,33 @@ Looking forward to welcoming you! Thank you.`);
     }
 
     if (ratio === '2:3') p += ` --ar 2:3`;
+    else if (ratio === '4:5') p += ` --ar 4:5`;
     else if (ratio === '1:1') p += ` --ar 1:1`;
     else if (ratio === '16:9') p += ` --ar 16:9`;
     else if (ratio === '3:4') p += ` --ar 3:4`;
 
-    if (engine === 'mj6') p += ` --v 6.0 --style raw`;
+    if (engine === 'midjourney' || engine === 'mj6') p += ` --v 6.1 --style raw`;
     else if (engine === 'flux') p += ` [Optimized for Flux.1 Pro fine-grain photorealism]`;
     else if (engine === 'sdxl') p += ` [Optimized for SDXL, 8k masterpiece, photorealistic]`;
 
-    return p;
+    return { text: p, activeReplacements };
+  }
+
+  function getCustomizedPrompt(pin) {
+    return getCustomizedPromptResult(pin).text;
   }
 
   function updateCustomizedPromptDisplay() {
     if (!state.activeModalPin) return;
-    const customized = getCustomizedPrompt(state.activeModalPin);
-    if (dom.modalPromptText) dom.modalPromptText.textContent = customized;
+    const { text: customized, activeReplacements } = getCustomizedPromptResult(state.activeModalPin);
+    if (dom.modalPromptText) {
+      renderHighlightedPromptPreview(dom.modalPromptText, customized, activeReplacements);
+    }
     if (dom.modalPromptCounts) {
       const words = customized.trim().split(/\s+/).filter(Boolean).length;
       dom.modalPromptCounts.textContent = `${words} words · ${customized.length} characters`;
     }
+    syncPromptVarsCardUI(detectPromptPlaceholders(state.activeModalPin.prompt));
   }
 
   // ==========================================================================
@@ -2987,9 +3815,9 @@ Looking forward to welcoming you! Thank you.`);
     // Render targeted view
     renderView(normalized);
 
-    // Update URL hash
+    // Update URL hash while keeping any active query params (e.g. ?pin=...)
     if (window.location.hash !== `#${normalized}`) {
-      window.history.replaceState(null, '', `#${normalized}`);
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search || ''}#${normalized}`);
     }
   }
 
@@ -3030,8 +3858,27 @@ Looking forward to welcoming you! Thank you.`);
         const catMatch = p.category.toLowerCase().includes(q);
         const descMatch = p.description.toLowerCase().includes(q);
         const tagsMatch = p.tags && p.tags.some(t => t.toLowerCase().includes(q));
+        const spotlightBadge = getPinSpotlightBadge(p.id);
+        const badgeMatch = Boolean(spotlightBadge && spotlightBadge.label.toLowerCase().includes(q));
         const promptMatch = canSearchPrompt && p.prompt && p.prompt.toLowerCase().includes(q);
-        return titleMatch || catMatch || descMatch || tagsMatch || promptMatch;
+        return titleMatch || catMatch || descMatch || tagsMatch || badgeMatch || promptMatch;
+      });
+    }
+
+    // Sort results
+    if (state.sortBy === 'featured_badges') {
+      list = [...list].sort((a, b) => {
+        const aHas = getPinSpotlightBadge(a.id) ? 1 : 0;
+        const bHas = getPinSpotlightBadge(b.id) ? 1 : 0;
+        return bHas - aHas;
+      });
+    } else if (state.sortBy === 'title_asc') {
+      list = [...list].sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
+    } else if (state.sortBy === 'saved_first') {
+      list = [...list].sort((a, b) => {
+        const aFav = state.favorites.has(a.id) ? 1 : 0;
+        const bFav = state.favorites.has(b.id) ? 1 : 0;
+        return bFav - aFav;
       });
     }
 
@@ -3100,6 +3947,18 @@ Looking forward to welcoming you! Thank you.`);
 
   const SKELETON_RATIO_CYCLE = ['4 / 5', '3 / 4', '1 / 1', '5 / 6', '4 / 3'];
 
+  function resolvePinRatioNumeric(pin, cardIndex = 0) {
+    const raw = String(pin?.aspectRatio || '').trim();
+    const colonMatch = raw.match(/^(\d+(?:\.\d+)?)\s*[:/x]\s*(\d+(?:\.\d+)?)$/i);
+    if (colonMatch) {
+      const w = parseFloat(colonMatch[1]);
+      const h = parseFloat(colonMatch[2]);
+      if (w > 0 && h > 0) return w / h;
+    }
+    const numericFallbacks = [0.8, 0.75, 1, 0.833, 1.333];
+    return numericFallbacks[cardIndex % numericFallbacks.length];
+  }
+
   function resolvePinSkeletonRatio(pin, cardIndex = 0) {
     const raw = String(pin?.aspectRatio || '').trim();
     const colonMatch = raw.match(/^(\d+(?:\.\d+)?)\s*[:/x]\s*(\d+(?:\.\d+)?)$/i);
@@ -3111,25 +3970,52 @@ Looking forward to welcoming you! Thank you.`);
     return SKELETON_RATIO_CYCLE[cardIndex % SKELETON_RATIO_CYCLE.length];
   }
 
-  function bindMediaRevealState(wrapperEl, imgEl) {
+  function bindMediaRevealState(wrapperEl, imgEl, fallbackSrc = 'assets/prompts/01.jpeg') {
     if (!wrapperEl || !imgEl) return;
+    let fallbackApplied = false;
+    let settled = false;
+
     const markLoaded = () => {
+      if (settled) return;
+      settled = true;
       wrapperEl.classList.remove('is-media-loading');
       wrapperEl.classList.add('is-media-loaded');
     };
+
     if (imgEl.complete && imgEl.naturalWidth > 0) {
       markLoaded();
       return;
     }
+
     wrapperEl.classList.remove('is-media-loaded');
     wrapperEl.classList.add('is-media-loading');
-    const onDone = () => {
-      imgEl.removeEventListener('load', onDone);
-      imgEl.removeEventListener('error', onDone);
+
+    const handleLoad = () => {
+      imgEl.removeEventListener('load', handleLoad);
+      imgEl.removeEventListener('error', handleError);
       markLoaded();
     };
-    imgEl.addEventListener('load', onDone, { once: true });
-    imgEl.addEventListener('error', onDone, { once: true });
+
+    const handleError = () => {
+      if (!fallbackApplied && fallbackSrc && !String(imgEl.getAttribute('src') || '').includes(fallbackSrc)) {
+        fallbackApplied = true;
+        imgEl.src = fallbackSrc;
+        return;
+      }
+      imgEl.removeEventListener('load', handleLoad);
+      imgEl.removeEventListener('error', handleError);
+      markLoaded();
+    };
+
+    imgEl.addEventListener('load', handleLoad);
+    imgEl.addEventListener('error', handleError);
+
+    // Ensure cached/already-decoded images reveal immediately on next frame
+    requestAnimationFrame(() => {
+      if (imgEl.complete && imgEl.naturalWidth > 0) {
+        handleLoad();
+      }
+    });
   }
 
   function createSkeletonPinCard(cardIndex = 0) {
@@ -3148,7 +4034,6 @@ Looking forward to welcoming you! Thank you.`);
       <div class="pin-skeleton-info">
         <div class="pin-skeleton-line studio-shimmer-surface" style="width: ${titleWidths[cardIndex % titleWidths.length]};"></div>
         <div class="pin-skeleton-meta">
-          <span class="pin-skeleton-avatar studio-shimmer-surface"></span>
           <span class="pin-skeleton-line sm studio-shimmer-surface" style="width: ${metaWidths[cardIndex % metaWidths.length]};"></span>
         </div>
       </div>
@@ -3158,9 +4043,15 @@ Looking forward to welcoming you! Thank you.`);
 
   function renderMasonrySkeletonFeed(ctrl, containerEl, count = 10) {
     initWaterfallColumns(ctrl, containerEl);
+    const isGrid = containerEl.classList.contains('is-uniform-grid');
     for (let i = 0; i < count; i++) {
-      const col = ctrl.cols[i % ctrl.cols.length];
-      if (col) col.appendChild(createSkeletonPinCard(i));
+      const skel = createSkeletonPinCard(i);
+      if (isGrid) {
+        containerEl.appendChild(skel);
+      } else {
+        const col = ctrl.cols[i % ctrl.cols.length];
+        if (col) col.appendChild(skel);
+      }
     }
   }
 
@@ -3185,26 +4076,28 @@ Looking forward to welcoming you! Thank you.`);
     card.className = 'pin-card';
     card.setAttribute('data-pin-id', pin.id);
 
-    const imgSrc = pin.thumbnail || pin.referenceImage || pin.image || 'assets/prompts/royal-portrait.jpg';
-    const isAboveFold = cardIndex < 4;
-    const imgLoadingAttr = isAboveFold ? '' : 'loading="lazy"';
-    const imgPriorityAttr = isAboveFold ? 'fetchpriority="high"' : 'fetchpriority="low"';
+    const imgSrc = pin.thumbnail || pin.referenceImage || pin.image || 'assets/prompts/01.jpeg';
+    const isPriority = cardIndex < 4;
+    const imgPriorityAttr = isPriority ? 'fetchpriority="high"' : 'fetchpriority="auto"';
     const skeletonRatio = resolvePinSkeletonRatio(pin, cardIndex);
+    const spotlightBadge = getPinSpotlightBadge(pin.id);
+    const spotlightBadgeHtml = spotlightBadge
+      ? `<span class="pin-spotlight-badge tone-${escapeHtml(spotlightBadge.tone)}">${escapeHtml(spotlightBadge.label)}</span>`
+      : '';
 
     card.innerHTML = `
       <div class="pin-media-container is-media-loading" data-action="view-pin" data-id="${pin.id}" style="--pin-skeleton-ratio: ${skeletonRatio};">
         <div class="pin-media-skeleton" aria-hidden="true">
           <svg class="pin-skeleton-emblem"><use href="#icon-frame"></use></svg>
         </div>
+        ${spotlightBadgeHtml}
         <img 
           class="pin-image" 
           src="${escapeHtml(imgSrc)}" 
           alt="${escapeHtml(pin.title)}" 
-          ${imgLoadingAttr}
           decoding="async"
           ${imgPriorityAttr}
           referrerPolicy="no-referrer"
-          onerror="this.onerror=null; this.src='assets/prompts/royal-portrait.jpg';"
         />
         <!-- Touch-first Mobile Heart Overlay Button -->
         <button 
@@ -3258,12 +4151,33 @@ Looking forward to welcoming you! Thank you.`);
         </div>
       </div>
 
-      <!-- Below-Image Clean Title & Author Row -->
+      <!-- Gallery Card Metadata & Quick Inline Actions -->
       <div class="pin-info-row" data-action="view-pin" data-id="${pin.id}">
         <h3 class="pin-title-text">${escapeHtml(pin.title)}</h3>
-        <div class="pin-author-row">
-          <div class="pin-author-avatar">YF</div>
+        <div class="pin-card-footer-meta">
           <span class="pin-author-name">${escapeHtml(pin.category)} · Studio Preset</span>
+          <div class="pin-inline-actions">
+            <button
+              type="button"
+              class="pin-inline-btn ${isFav ? 'is-fav' : ''}"
+              data-action="fav-pin"
+              data-id="${pin.id}"
+              title="${isFav ? 'Remove from Saved' : 'Save to Favorites'}"
+              aria-label="${isFav ? 'Remove from Saved' : 'Save to Favorites'}"
+            >
+              <svg style="width: 13px; height: 13px;"><use href="#icon-heart"></use></svg>
+            </button>
+            <button
+              type="button"
+              class="pin-inline-btn"
+              data-action="copy-prompt"
+              data-id="${pin.id}"
+              title="Copy AI Prompt"
+              aria-label="Copy AI Prompt"
+            >
+              <svg style="width: 13px; height: 13px;"><use href="#icon-copy"></use></svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -3285,7 +4199,8 @@ Looking forward to welcoming you! Thank you.`);
 
     bindMediaRevealState(
       card.querySelector('.pin-media-container'),
-      card.querySelector('.pin-image')
+      card.querySelector('.pin-image'),
+      'assets/prompts/01.jpeg'
     );
 
     return card;
@@ -3309,20 +4224,27 @@ Looking forward to welcoming you! Thank you.`);
     return div;
   }
 
-  function getTargetWaterfallColumn(cols, itemIndex) {
+  function getTargetWaterfallColumn(ctrl, itemIndex, pin) {
+    const cols = ctrl?.cols;
     if (!cols || cols.length === 0) return null;
-    // First row fills left-to-right cleanly; subsequent cards append to shortest column
-    if (itemIndex < cols.length) return cols[itemIndex];
-    let shortest = cols[0];
-    let minHeight = cols[0].offsetHeight;
-    for (let i = 1; i < cols.length; i++) {
-      const h = cols[i].offsetHeight;
-      if (h < minHeight) {
-        minHeight = h;
-        shortest = cols[i];
+    if (!Array.isArray(ctrl.colWeights) || ctrl.colWeights.length !== cols.length) {
+      ctrl.colWeights = new Array(cols.length).fill(0);
+    }
+    let targetIdx = 0;
+    if (itemIndex < cols.length) {
+      targetIdx = itemIndex;
+    } else {
+      let minWeight = ctrl.colWeights[0];
+      for (let i = 1; i < cols.length; i++) {
+        if (ctrl.colWeights[i] < minWeight) {
+          minWeight = ctrl.colWeights[i];
+          targetIdx = i;
+        }
       }
     }
-    return shortest;
+    const ratioNum = Math.max(0.55, Math.min(1.6, resolvePinRatioNumeric(pin, itemIndex)));
+    ctrl.colWeights[targetIdx] += (1 / ratioNum) + 0.34;
+    return cols[targetIdx];
   }
 
   function updateFeedSentinelUI(feedKey) {
@@ -3368,12 +4290,36 @@ Looking forward to welcoming you! Thank you.`);
     }
   }
 
+  function syncFeedControlButtonsUI() {
+    if (dom.btnLayoutMasonry) {
+      dom.btnLayoutMasonry.classList.toggle('active', state.feedLayout !== 'grid');
+    }
+    if (dom.btnLayoutGrid) {
+      dom.btnLayoutGrid.classList.toggle('active', state.feedLayout === 'grid');
+    }
+    if (dom.feedSortSelect && dom.feedSortSelect.value !== state.sortBy) {
+      dom.feedSortSelect.value = state.sortBy;
+    }
+  }
+
   function initWaterfallColumns(ctrl, containerEl) {
-    const colCount = getMasonryColumnCount();
+    const useUniformGrid = ctrl === feedControllers.home && state.feedLayout === 'grid';
     containerEl.innerHTML = '';
+    ctrl.colWeights = [];
+    if (useUniformGrid) {
+      containerEl.classList.remove('pins-masonry-cols');
+      containerEl.classList.add('is-uniform-grid');
+      ctrl.cols = [];
+      ctrl.colCount = getMasonryColumnCount();
+      return;
+    }
+
+    const colCount = getMasonryColumnCount();
+    containerEl.classList.remove('is-uniform-grid');
     containerEl.classList.add('pins-masonry-cols');
     ctrl.cols = [];
     ctrl.colCount = colCount;
+    ctrl.colWeights = new Array(colCount).fill(0);
     for (let i = 0; i < colCount; i++) {
       const col = document.createElement('div');
       col.className = 'pins-masonry-col';
@@ -3387,10 +4333,16 @@ Looking forward to welcoming you! Thank you.`);
     if (!ctrl || !ctrl.container || ctrl.renderedCount >= ctrl.allPins.length) return 0;
 
     const end = Math.min(ctrl.renderedCount + count, ctrl.allPins.length);
+    const isUniformGrid = ctrl.container.classList.contains('is-uniform-grid');
+
     for (let i = ctrl.renderedCount; i < end; i++) {
-      const col = getTargetWaterfallColumn(ctrl.cols, i);
-      if (col) {
-        col.appendChild(createPinCard(ctrl.allPins[i], i));
+      const pin = ctrl.allPins[i];
+      const cardEl = createPinCard(pin, i);
+      if (isUniformGrid) {
+        ctrl.container.appendChild(cardEl);
+      } else {
+        const col = getTargetWaterfallColumn(ctrl, i, pin);
+        if (col) col.appendChild(cardEl);
       }
     }
     ctrl.renderedCount = end;
@@ -3441,7 +4393,7 @@ Looking forward to welcoming you! Thank you.`);
         updateFeedSentinelUI(feedKey);
         return;
       }
-      containerEl.classList.remove('pins-masonry-cols');
+      containerEl.classList.remove('pins-masonry-cols', 'is-uniform-grid');
       containerEl.innerHTML = '';
       ctrl.cols = [];
       containerEl.appendChild(createEmptyPinState(emptyTitle, emptyMessage));
@@ -3457,6 +4409,10 @@ Looking forward to welcoming you! Thank you.`);
     const newColCount = getMasonryColumnCount();
     Object.entries(feedControllers).forEach(([key, ctrl]) => {
       if (!ctrl.container || ctrl.renderedCount === 0 || ctrl.colCount === newColCount) return;
+      if (ctrl.container.classList.contains('is-uniform-grid')) {
+        ctrl.colCount = newColCount;
+        return;
+      }
       const renderedSliceCount = ctrl.renderedCount;
       initWaterfallColumns(ctrl, ctrl.container);
       ctrl.renderedCount = 0;
@@ -3536,10 +4492,10 @@ Looking forward to welcoming you! Thank you.`);
           <div class="pin-media-skeleton" aria-hidden="true">
             <svg class="pin-skeleton-emblem"><use href="#icon-frame"></use></svg>
           </div>
-          <img class="board-main-thumb" src="${escapeHtml(mainImg)}" alt="${escapeHtml(cat)}" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+          <img class="board-main-thumb" src="${escapeHtml(mainImg)}" alt="${escapeHtml(cat)}" decoding="async" referrerPolicy="no-referrer" />
           <div class="board-sub-thumbs">
-            <img class="board-sub-thumb" src="${escapeHtml(sub1)}" alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
-            <img class="board-sub-thumb" src="${escapeHtml(sub2)}" alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+            <img class="board-sub-thumb" src="${escapeHtml(sub1)}" alt="" decoding="async" referrerPolicy="no-referrer" />
+            <img class="board-sub-thumb" src="${escapeHtml(sub2)}" alt="" decoding="async" referrerPolicy="no-referrer" />
           </div>
         </div>
         <div class="board-meta">
@@ -3894,6 +4850,87 @@ Looking forward to welcoming you! Thank you.`);
           </div>
         `).join('');
     }
+
+    renderAdminPinBadgesManager();
+  }
+
+  function renderAdminPinBadgesManager() {
+    if (!isAdminUser()) return;
+    const allPins = getAllPrompts();
+    const filterQ = dom.adminBadgePinSearch ? dom.adminBadgePinSearch.value.trim().toLowerCase() : '';
+    const badgedEntries = Object.entries(state.pinBadges || {});
+
+    if (dom.adminBadgeActiveCount) {
+      dom.adminBadgeActiveCount.textContent = `${badgedEntries.length} tagged ${badgedEntries.length === 1 ? 'pin' : 'pins'}`;
+    }
+
+    if (dom.adminBadgePinSelect) {
+      const prevVal = dom.adminBadgePinSelect.value;
+      const filteredPins = filterQ
+        ? allPins.filter(p =>
+            String(p.title || '').toLowerCase().includes(filterQ) ||
+            String(p.category || '').toLowerCase().includes(filterQ) ||
+            String(p.id).includes(filterQ)
+          )
+        : allPins;
+      dom.adminBadgePinSelect.innerHTML = filteredPins.length === 0
+        ? '<option value="">No matching pins</option>'
+        : filteredPins.map(p => {
+            const b = getPinSpotlightBadge(p.id);
+            const tagSuffix = b ? ` [${b.label}]` : '';
+            return `<option value="${escapeHtml(String(p.id))}">${escapeHtml(p.title)} (${escapeHtml(p.category)})${escapeHtml(tagSuffix)}</option>`;
+          }).join('');
+      if (prevVal && filteredPins.some(p => String(p.id) === prevVal)) {
+        dom.adminBadgePinSelect.value = prevVal;
+      }
+      syncAdminBadgeComposerInputsFromSelection();
+    }
+
+    if (dom.adminBadgedPinsGrid) {
+      if (badgedEntries.length === 0) {
+        dom.adminBadgedPinsGrid.innerHTML = '<div class="admin-log-empty">No pins tagged yet. Pick any style above or open any pin card to attach a Best Seller / Trending tag.</div>';
+      } else {
+        const pinMap = new Map(allPins.map(p => [String(p.id), p]));
+        dom.adminBadgedPinsGrid.innerHTML = badgedEntries.map(([pinId, badge]) => {
+          const pin = pinMap.get(String(pinId));
+          const title = pin ? pin.title : `Style #${pinId}`;
+          const img = pin ? (pin.thumbnail || pin.referenceImage || pin.image || 'assets/prompts/01.jpeg') : 'assets/prompts/01.jpeg';
+          return `
+            <div class="admin-badged-pin-card">
+              <img class="admin-badged-pin-thumb" src="${escapeHtml(img)}" alt="${escapeHtml(title)}" />
+              <div class="admin-badged-pin-meta">
+                <div class="admin-badged-pin-title">${escapeHtml(title)}</div>
+                <div>
+                  <span class="pin-spotlight-badge tone-${escapeHtml(badge.tone)}">${escapeHtml(badge.label)}</span>
+                </div>
+                <div class="admin-badged-pin-actions">
+                  <button type="button" class="admin-badged-mini-btn" data-admin-edit-badge="${escapeHtml(String(pinId))}">Edit</button>
+                  <button type="button" class="admin-badged-mini-btn danger" data-admin-remove-badge="${escapeHtml(String(pinId))}">Remove</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+  }
+
+  function syncAdminBadgeComposerInputsFromSelection() {
+    if (!dom.adminBadgePinSelect) return;
+    const pinId = dom.adminBadgePinSelect.value;
+    const badge = getPinSpotlightBadge(pinId);
+    if (dom.txtAdminBadgeLabel) {
+      dom.txtAdminBadgeLabel.value = badge ? badge.label : '';
+    }
+    if (dom.selAdminBadgeTone && badge) {
+      dom.selAdminBadgeTone.value = badge.tone;
+    }
+    if (dom.adminBadgePresetRow) {
+      dom.adminBadgePresetRow.querySelectorAll('.admin-badge-preset-btn').forEach(btn => {
+        const isMatch = Boolean(badge && btn.getAttribute('data-badge-label') === badge.label);
+        btn.classList.toggle('active', isMatch);
+      });
+    }
   }
 
   async function loadAdminDashboard(silent = false) {
@@ -3909,6 +4946,12 @@ Looking forward to welcoming you! Thank you.`);
         if (isAdminUser()) loadAdminDashboard(true);
       });
     }
+
+    void cloudSync.fetchPinBadges().then(bRes => {
+      if (bRes?.ok && bRes.badges) {
+        applyServerPinBadges(bRes.badges);
+      }
+    });
 
     let res;
     try {
@@ -4116,7 +5159,7 @@ Looking forward to welcoming you! Thank you.`);
   // PINTEREST 2-COLUMN PIN DETAIL MODAL
   // ==========================================================================
   function openPinModal(pinId) {
-    const pin = getAllPrompts().find(p => p.id === Number(pinId));
+    const pin = getAllPrompts().find(p => String(p.id) === String(pinId));
     if (!pin) return;
 
     state.activeModalPin = pin;
@@ -4125,11 +5168,17 @@ Looking forward to welcoming you! Thank you.`);
     // Track in history
     recordRecent(pin.id);
 
-    // Reset Smart Prompt Customizer
+    // Reset Smart Prompt Customizer & Auto-Fill Client Variables
     state.customizer = { subject: 'default', ratio: 'default', light: 'default', engine: 'default' };
+    state.promptVars = {};
     if (dom.pinPromptCustomizer) {
       dom.pinPromptCustomizer.querySelectorAll('.cust-chip').forEach(c => {
-        c.classList.toggle('active', c.getAttribute('data-val') === 'default');
+        const isFirstDefault = c.getAttribute('data-subject') === 'original'
+          || c.getAttribute('data-ratio') === '2:3'
+          || c.getAttribute('data-light') === 'studio'
+          || c.getAttribute('data-engine') === 'natural'
+          || c.getAttribute('data-val') === 'default';
+        c.classList.toggle('active', isFirstDefault);
       });
     }
 
@@ -4160,10 +5209,11 @@ Looking forward to welcoming you! Thank you.`);
     }
     if (dom.modalBeforeImg) dom.modalBeforeImg.src = imgSrc;
 
-    // Details
+    // Details & Spotlight Badge
     dom.modalPinTitle.textContent = pin.title;
     dom.modalCategoryBadge.textContent = `${pin.category} · Studio Preset`;
     dom.modalPinDesc.textContent = pin.description;
+    updateModalSpotlightBadgeUI(pin);
 
     // Tags
     dom.modalTagsContainer.innerHTML = '';
@@ -4176,6 +5226,8 @@ Looking forward to welcoming you! Thank you.`);
           closePinModal();
           state.searchQuery = tag;
           if (dom.globalSearchInput) dom.globalSearchInput.value = tag;
+          if (dom.searchClearBtn) dom.searchClearBtn.style.display = 'flex';
+          syncSearchExpandState();
           switchView('home');
         });
         dom.modalTagsContainer.appendChild(span);
@@ -4195,9 +5247,50 @@ Looking forward to welcoming you! Thank you.`);
     dom.btnModalCopyLabel.textContent = 'Copy Prompt';
     dom.btnModalCopyPrompt.classList.remove('copied');
 
-    // Show modal
+    // Reset details scroll & share popover, sync ?pin=<id>, and show modal
+    closePinSharePopover();
+    const detailsScroll = document.getElementById('modalDetailsScroll');
+    if (detailsScroll) detailsScroll.scrollTop = 0;
+    syncPinQueryInUrl(pin.id);
     dom.pinDetailModal.classList.add('active');
     document.body.style.overflow = 'hidden';
+  }
+
+  function updateModalSpotlightBadgeUI(pin) {
+    if (!pin) return;
+    const badge = getPinSpotlightBadge(pin.id);
+    if (dom.modalSpotlightBadgeRow && dom.modalSpotlightBadge) {
+      if (badge) {
+        dom.modalSpotlightBadge.className = `pin-spotlight-badge tone-${badge.tone}`;
+        dom.modalSpotlightBadge.textContent = badge.label;
+        dom.modalSpotlightBadgeRow.style.display = 'flex';
+      } else {
+        dom.modalSpotlightBadgeRow.style.display = 'none';
+        dom.modalSpotlightBadge.textContent = '';
+      }
+    }
+
+    const canManageBadges = isAdminUser();
+    if (dom.modalAdminBadgeBar) {
+      dom.modalAdminBadgeBar.style.display = canManageBadges ? 'flex' : 'none';
+    }
+    if (!canManageBadges) return;
+
+    if (dom.btnModalAdminBadgeClear) {
+      dom.btnModalAdminBadgeClear.style.display = badge ? 'inline-flex' : 'none';
+    }
+    if (dom.txtModalAdminBadgeLabel) {
+      dom.txtModalAdminBadgeLabel.value = badge ? badge.label : '';
+    }
+    if (dom.selModalAdminBadgeTone) {
+      dom.selModalAdminBadgeTone.value = badge ? badge.tone : 'amazon';
+    }
+    if (dom.modalAdminBadgePresets) {
+      dom.modalAdminBadgePresets.querySelectorAll('.modal-badge-chip').forEach(btn => {
+        const isMatch = Boolean(badge && btn.getAttribute('data-badge-label') === badge.label);
+        btn.classList.toggle('active', isMatch);
+      });
+    }
   }
 
   function applyModalPromptAccessUI(pin) {
@@ -4208,6 +5301,7 @@ Looking forward to welcoming you! Thank you.`);
       if (dom.modalPromptText) dom.modalPromptText.textContent = '';
       if (dom.modalPromptCounts) dom.modalPromptCounts.textContent = 'Locked';
       if (dom.modalPromptCard) dom.modalPromptCard.style.display = 'none';
+      if (dom.modalVarsCard) dom.modalVarsCard.style.display = 'none';
       if (dom.pinPromptCustomizer) dom.pinPromptCustomizer.style.display = 'none';
       if (dom.modalClientShowroomCard) dom.modalClientShowroomCard.style.display = 'none';
       if (dom.btnModalAutoTake) dom.btnModalAutoTake.style.display = 'none';
@@ -4265,11 +5359,18 @@ Looking forward to welcoming you! Thank you.`);
     if (dom.btnMobModalAutoTake) dom.btnMobModalAutoTake.style.display = '';
     if (dom.btnMobModalCopyPrompt) dom.btnMobModalCopyPrompt.style.display = '';
     if (dom.pinPromptCustomizer) dom.pinPromptCustomizer.style.display = state.clientMode ? 'none' : '';
+    if (dom.modalVarsCard) dom.modalVarsCard.style.display = state.clientMode ? 'none' : 'block';
     if (dom.modalPromptCard) dom.modalPromptCard.style.display = state.clientMode ? 'none' : 'block';
     if (dom.modalClientShowroomCard) dom.modalClientShowroomCard.style.display = state.clientMode ? 'block' : 'none';
 
-    const displayPrompt = getCustomizedPrompt(pin);
-    if (dom.modalPromptText) dom.modalPromptText.textContent = displayPrompt;
+    if (!state.clientMode) {
+      renderPromptVarsPanel(pin);
+    }
+
+    const { text: displayPrompt, activeReplacements } = getCustomizedPromptResult(pin);
+    if (dom.modalPromptText) {
+      renderHighlightedPromptPreview(dom.modalPromptText, displayPrompt, activeReplacements);
+    }
     if (dom.modalPromptCounts) {
       const words = displayPrompt ? displayPrompt.trim().split(/\s+/).filter(Boolean).length : 0;
       const chars = displayPrompt ? displayPrompt.length : 0;
@@ -4278,6 +5379,8 @@ Looking forward to welcoming you! Thank you.`);
   }
 
   function closePinModal() {
+    closePinSharePopover();
+    clearPinQueryFromUrl();
     dom.pinDetailModal.classList.remove('active');
     document.body.style.overflow = '';
     state.activeModalPin = null;
@@ -4318,6 +5421,36 @@ Looking forward to welcoming you! Thank you.`);
     dom.fullscreenLightbox.classList.remove('active');
   }
 
+  let searchTypingAuraTimer = null;
+
+  function pulseSearchTypingAura(active = true) {
+    if (!dom.headerSearchContainer) return;
+    if (searchTypingAuraTimer) {
+      clearTimeout(searchTypingAuraTimer);
+      searchTypingAuraTimer = null;
+    }
+    if (!active) {
+      dom.headerSearchContainer.classList.remove('is-search-typing');
+      return;
+    }
+    dom.headerSearchContainer.classList.add('is-search-typing');
+    searchTypingAuraTimer = setTimeout(() => {
+      if (dom.headerSearchContainer) {
+        dom.headerSearchContainer.classList.remove('is-search-typing');
+      }
+      searchTypingAuraTimer = null;
+    }, 850);
+  }
+
+  function syncSearchExpandState(forceFocused = null) {
+    if (!dom.pinterestHeader || !dom.globalSearchInput) return;
+    const isFocused = forceFocused !== null
+      ? Boolean(forceFocused)
+      : (document.activeElement === dom.globalSearchInput);
+    const hasQuery = dom.globalSearchInput.value.trim().length > 0;
+    dom.pinterestHeader.classList.toggle('is-search-expanded', isFocused || hasQuery);
+  }
+
   // ==========================================================================
   // EVENT LISTENERS & DELEGATION
   // ==========================================================================
@@ -4347,6 +5480,8 @@ Looking forward to welcoming you! Thank you.`);
         state.selectedCategory = 'All';
         state.searchQuery = '';
         if (dom.globalSearchInput) dom.globalSearchInput.value = '';
+        if (dom.searchClearBtn) dom.searchClearBtn.style.display = 'none';
+        syncSearchExpandState(false);
         renderCategoryChips();
         switchView('home');
         scheduleCloudFilterSync(0);
@@ -4399,29 +5534,111 @@ Looking forward to welcoming you! Thank you.`);
       });
     }
 
-    // 3. Global Search Input
+    // 3. Global Search Input (auto-expands over nav links while typing/focused)
     if (dom.globalSearchInput) {
+      dom.globalSearchInput.addEventListener('focus', () => {
+        syncSearchExpandState(true);
+      });
+
+      dom.globalSearchInput.addEventListener('blur', () => {
+        pulseSearchTypingAura(false);
+        setTimeout(() => {
+          if (document.activeElement !== dom.globalSearchInput) {
+            syncSearchExpandState(false);
+          }
+        }, 120);
+      });
+
       dom.globalSearchInput.addEventListener('input', (e) => {
         const val = e.target.value;
         state.searchQuery = val;
         dom.searchClearBtn.style.display = val.trim().length > 0 ? 'flex' : 'none';
+        syncSearchExpandState(true);
+        pulseSearchTypingAura(val.length > 0);
 
         if (state.currentView !== 'home') switchView('home');
         else renderHomeFeed();
         scheduleCloudFilterSync(320);
       });
+
+      dom.globalSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (dom.globalSearchInput.value.trim().length > 0) {
+            state.searchQuery = '';
+            dom.globalSearchInput.value = '';
+            if (dom.searchClearBtn) dom.searchClearBtn.style.display = 'none';
+            renderHomeFeed();
+            scheduleCloudFilterSync(0);
+          }
+          pulseSearchTypingAura(false);
+          dom.globalSearchInput.blur();
+          syncSearchExpandState(false);
+        } else if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+          pulseSearchTypingAura(true);
+        }
+      });
     }
 
     if (dom.searchClearBtn) {
+      dom.searchClearBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+      });
       dom.searchClearBtn.addEventListener('click', () => {
         state.searchQuery = '';
         dom.globalSearchInput.value = '';
         dom.searchClearBtn.style.display = 'none';
         dom.globalSearchInput.focus();
+        syncSearchExpandState(true);
         renderHomeFeed();
         scheduleCloudFilterSync(0);
       });
     }
+
+    if (dom.btnMobileSearchCancel) {
+      dom.btnMobileSearchCancel.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+      });
+      dom.btnMobileSearchCancel.addEventListener('click', () => {
+        const hadQuery = Boolean(dom.globalSearchInput && dom.globalSearchInput.value.trim().length > 0);
+        state.searchQuery = '';
+        if (dom.globalSearchInput) {
+          dom.globalSearchInput.value = '';
+          dom.globalSearchInput.blur();
+        }
+        if (dom.searchClearBtn) dom.searchClearBtn.style.display = 'none';
+        pulseSearchTypingAura(false);
+        syncSearchExpandState(false);
+        if (hadQuery) {
+          renderHomeFeed();
+          scheduleCloudFilterSync(0);
+        }
+      });
+    }
+
+    // Feed Layout Mode Toggle (Waterfall vs Studio Grid) & Sort Selector
+    if (dom.feedLayoutToggle) {
+      dom.feedLayoutToggle.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-layout]');
+        if (!btn) return;
+        const nextLayout = btn.getAttribute('data-layout') === 'grid' ? 'grid' : 'masonry';
+        if (state.feedLayout === nextLayout) return;
+        state.feedLayout = nextLayout;
+        try {
+          localStorage.setItem(STORAGE_KEYS.FEED_LAYOUT, nextLayout);
+        } catch {}
+        syncFeedControlButtonsUI();
+        renderHomeFeed();
+      });
+    }
+
+    if (dom.feedSortSelect) {
+      dom.feedSortSelect.addEventListener('change', (e) => {
+        state.sortBy = e.target.value || 'recent';
+        renderHomeFeed();
+      });
+    }
+
+    syncFeedControlButtonsUI();
 
     // Progressive Scroll-to-Load Sentinels & Load-More Fallback Buttons
     [
@@ -4529,11 +5746,14 @@ Looking forward to welcoming you! Thank you.`);
         if (pin) {
           const ok = await copyPromptToClipboard(pin.prompt, pin.id);
           if (ok) {
-            const lbl = copyBtn.querySelector('.save-label') || copyBtn;
-            lbl.textContent = 'Copied!';
+            const lbl = copyBtn.querySelector('.save-label');
+            const useEl = copyBtn.querySelector('svg use');
+            if (lbl) lbl.textContent = 'Copied!';
+            else if (useEl) useEl.setAttribute('href', '#icon-check');
             copyBtn.classList.add('copied');
             setTimeout(() => {
-              lbl.textContent = 'Copy';
+              if (lbl) lbl.textContent = 'Copy';
+              else if (useEl) useEl.setAttribute('href', '#icon-copy');
               copyBtn.classList.remove('copied');
             }, 2000);
           }
@@ -4576,6 +5796,7 @@ Looking forward to welcoming you! Thank you.`);
         state.searchQuery = '';
         if (dom.globalSearchInput) dom.globalSearchInput.value = '';
         if (dom.searchClearBtn) dom.searchClearBtn.style.display = 'none';
+        syncSearchExpandState(false);
         renderCategoryChips();
         renderHomeFeed();
         scheduleCloudFilterSync(0);
@@ -4609,9 +5830,70 @@ Looking forward to welcoming you! Thank you.`);
       updateModalFavState();
     });
 
-    dom.btnModalShare.addEventListener('click', async () => {
-      if (!state.activeModalPin) return;
-      showToast('Pin link ready to share');
+    dom.btnModalShare.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await handleShareActivePin();
+    });
+
+    if (dom.btnCloseSharePopover) {
+      dom.btnCloseSharePopover.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closePinSharePopover();
+      });
+    }
+
+    if (dom.inputSharePinUrl) {
+      dom.inputSharePinUrl.addEventListener('click', () => {
+        dom.inputSharePinUrl.select();
+      });
+    }
+
+    if (dom.btnShareCopyLink) {
+      dom.btnShareCopyLink.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const url = dom.inputSharePinUrl?.value || (state.activeModalPin ? buildPinShareUrl(state.activeModalPin) : window.location.href);
+        const ok = await copyPlainTextToClipboard(url);
+        if (ok) {
+          dom.btnShareCopyLink.textContent = 'Copied';
+          dom.btnShareCopyLink.classList.add('copied');
+          showToast('Pin link copied to clipboard!');
+          setTimeout(() => {
+            if (dom.btnShareCopyLink) {
+              dom.btnShareCopyLink.textContent = 'Copy';
+              dom.btnShareCopyLink.classList.remove('copied');
+            }
+          }, 1800);
+        } else {
+          showToast('Select the link box above to copy');
+        }
+      });
+    }
+
+    if (dom.btnShareNativeTrigger) {
+      dom.btnShareNativeTrigger.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!state.activeModalPin || typeof navigator.share !== 'function') return;
+        const shareUrl = buildPinShareUrl(state.activeModalPin);
+        try {
+          await navigator.share({
+            title: `${state.activeModalPin.title || 'Studio Style'} — Yashraj Frames Studio`,
+            text: `Check out "${state.activeModalPin.title || 'this portrait style'}" on Yashraj Frames AI Studio`,
+            url: shareUrl
+          });
+          closePinSharePopover();
+          showToast('Style shared!');
+        } catch (err) {
+          if (err && err.name !== 'AbortError') {
+            showToast('Link already copied to clipboard!');
+          }
+        }
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!dom.pinSharePopover || dom.pinSharePopover.style.display === 'none') return;
+      if (dom.pinSharePopover.contains(e.target) || dom.btnModalShare?.contains(e.target)) return;
+      closePinSharePopover();
     });
 
     if (dom.btnModalViewInFrame) {
@@ -5007,6 +6289,97 @@ Looking forward to welcoming you! Thank you.`);
     if (dom.btnSaveCustomStyle) {
       dom.btnSaveCustomStyle.addEventListener('click', handleSaveCustomStyle);
     }
+    if (dom.selNewStyleBadgePreset && dom.newStyleCustomBadgeGroup) {
+      dom.selNewStyleBadgePreset.addEventListener('change', (e) => {
+        dom.newStyleCustomBadgeGroup.style.display = e.target.value === '__custom__' ? 'flex' : 'none';
+      });
+    }
+    if (dom.modalAdminBadgePresets) {
+      dom.modalAdminBadgePresets.addEventListener('click', (e) => {
+        const chip = e.target.closest('[data-badge-label]');
+        if (!chip || !state.activeModalPin) return;
+        const label = chip.getAttribute('data-badge-label') || '';
+        const tone = chip.getAttribute('data-badge-tone') || 'amazon';
+        void saveAdminPinSpotlightBadge({ pinId: state.activeModalPin.id, label, tone });
+      });
+    }
+    if (dom.btnModalAdminBadgeApply) {
+      dom.btnModalAdminBadgeApply.addEventListener('click', () => {
+        if (!state.activeModalPin) return;
+        const label = dom.txtModalAdminBadgeLabel ? dom.txtModalAdminBadgeLabel.value : '';
+        const tone = dom.selModalAdminBadgeTone ? dom.selModalAdminBadgeTone.value : 'amazon';
+        void saveAdminPinSpotlightBadge({ pinId: state.activeModalPin.id, label, tone });
+      });
+    }
+    if (dom.txtModalAdminBadgeLabel) {
+      dom.txtModalAdminBadgeLabel.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && state.activeModalPin) {
+          e.preventDefault();
+          const tone = dom.selModalAdminBadgeTone ? dom.selModalAdminBadgeTone.value : 'amazon';
+          void saveAdminPinSpotlightBadge({ pinId: state.activeModalPin.id, label: dom.txtModalAdminBadgeLabel.value, tone });
+        }
+      });
+    }
+    if (dom.btnModalAdminBadgeClear) {
+      dom.btnModalAdminBadgeClear.addEventListener('click', () => {
+        if (!state.activeModalPin) return;
+        void saveAdminPinSpotlightBadge({ pinId: state.activeModalPin.id, remove: true });
+      });
+    }
+    if (dom.adminBadgePinSearch) {
+      dom.adminBadgePinSearch.addEventListener('input', () => renderAdminPinBadgesManager());
+    }
+    if (dom.adminBadgePinSelect) {
+      dom.adminBadgePinSelect.addEventListener('change', syncAdminBadgeComposerInputsFromSelection);
+    }
+    if (dom.adminBadgePresetRow) {
+      dom.adminBadgePresetRow.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-badge-label]');
+        if (!btn) return;
+        const label = btn.getAttribute('data-badge-label') || '';
+        const tone = btn.getAttribute('data-badge-tone') || 'amazon';
+        if (dom.txtAdminBadgeLabel) dom.txtAdminBadgeLabel.value = label;
+        if (dom.selAdminBadgeTone) dom.selAdminBadgeTone.value = tone;
+        if (dom.adminBadgePinSelect && dom.adminBadgePinSelect.value) {
+          void saveAdminPinSpotlightBadge({ pinId: dom.adminBadgePinSelect.value, label, tone });
+        }
+      });
+    }
+    if (dom.btnAdminApplyPinBadge) {
+      dom.btnAdminApplyPinBadge.addEventListener('click', () => {
+        const pinId = dom.adminBadgePinSelect ? dom.adminBadgePinSelect.value : '';
+        const label = dom.txtAdminBadgeLabel ? dom.txtAdminBadgeLabel.value : '';
+        const tone = dom.selAdminBadgeTone ? dom.selAdminBadgeTone.value : 'amazon';
+        void saveAdminPinSpotlightBadge({ pinId, label, tone });
+      });
+    }
+    if (dom.btnAdminClearPinBadge) {
+      dom.btnAdminClearPinBadge.addEventListener('click', () => {
+        const pinId = dom.adminBadgePinSelect ? dom.adminBadgePinSelect.value : '';
+        void saveAdminPinSpotlightBadge({ pinId, remove: true });
+      });
+    }
+    if (dom.adminBadgedPinsGrid) {
+      dom.adminBadgedPinsGrid.addEventListener('click', (e) => {
+        const editBtn = e.target.closest('[data-admin-edit-badge]');
+        if (editBtn) {
+          const pinId = editBtn.getAttribute('data-admin-edit-badge');
+          if (dom.adminBadgePinSearch) dom.adminBadgePinSearch.value = '';
+          renderAdminPinBadgesManager();
+          if (dom.adminBadgePinSelect) {
+            dom.adminBadgePinSelect.value = pinId;
+            syncAdminBadgeComposerInputsFromSelection();
+            dom.txtAdminBadgeLabel?.focus();
+          }
+          return;
+        }
+        const remBtn = e.target.closest('[data-admin-remove-badge]');
+        if (remBtn) {
+          const pinId = remBtn.getAttribute('data-admin-remove-badge');
+          void saveAdminPinSpotlightBadge({ pinId, remove: true });
+        }
+      });
+    }
     if (dom.btnExportCustomStyles) {
       dom.btnExportCustomStyles.addEventListener('click', exportCustomStylesJson);
     }
@@ -5075,6 +6448,52 @@ Looking forward to welcoming you! Thank you.`);
       isDraggingSplit = false;
     });
 
+    // Auto-Fill Client Variables Live Input Handlers
+    if (dom.modalVarsGrid) {
+      dom.modalVarsGrid.addEventListener('input', (e) => {
+        const input = e.target.closest('[data-var-key]');
+        if (!input) return;
+        const key = input.getAttribute('data-var-key');
+        if (!key) return;
+        state.promptVars[key] = input.value;
+        input.classList.toggle('has-value', input.value.trim().length > 0);
+        updateCustomizedPromptDisplay();
+      });
+    }
+
+    if (dom.btnModalVarsClear) {
+      dom.btnModalVarsClear.addEventListener('click', () => {
+        state.promptVars = {};
+        if (dom.modalVarsGrid) {
+          dom.modalVarsGrid.querySelectorAll('[data-var-key]').forEach(el => {
+            el.value = '';
+            el.classList.remove('has-value');
+          });
+        }
+        updateCustomizedPromptDisplay();
+        showToast('Placeholder fields cleared');
+      });
+    }
+
+    if (dom.btnModalVarsToggle) {
+      dom.btnModalVarsToggle.addEventListener('click', () => {
+        state.promptVarsExpanded = !state.promptVarsExpanded;
+        if (state.activeModalPin) {
+          syncPromptVarsCardUI(detectPromptPlaceholders(state.activeModalPin.prompt));
+        }
+      });
+    }
+
+    if (dom.btnToggleCustomizer && dom.customizerBody) {
+      dom.btnToggleCustomizer.addEventListener('click', () => {
+        const isOpen = dom.customizerBody.style.display !== 'none';
+        dom.customizerBody.style.display = isOpen ? 'none' : 'block';
+        if (dom.customizerToggleArrow) {
+          dom.customizerToggleArrow.textContent = isOpen ? '▾' : '▴';
+        }
+      });
+    }
+
     // Smart Prompt Customizer Chips Handlers
     if (dom.pinPromptCustomizer) {
       dom.pinPromptCustomizer.addEventListener('click', (e) => {
@@ -5086,12 +6505,20 @@ Looking forward to welcoming you! Thank you.`);
         row.querySelectorAll('.cust-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
 
-        const type = chip.getAttribute('data-type');
-        const val = chip.getAttribute('data-val');
-        if (type && val) {
-          state.customizer[type] = val;
-          updateCustomizedPromptDisplay();
+        const attrMap = [
+          ['subject', chip.getAttribute('data-subject')],
+          ['ratio', chip.getAttribute('data-ratio')],
+          ['light', chip.getAttribute('data-light')],
+          ['engine', chip.getAttribute('data-engine')],
+          [chip.getAttribute('data-type'), chip.getAttribute('data-val')]
+        ];
+        for (const [k, v] of attrMap) {
+          if (k && v) {
+            state.customizer[k] = v;
+            break;
+          }
         }
+        updateCustomizedPromptDisplay();
       });
     }
 
@@ -5195,7 +6622,7 @@ Looking forward to welcoming you! Thank you.`);
         if (dom.lblMobModalCopy) dom.lblMobModalCopy.textContent = 'Copied!';
         if (dom.btnMobModalCopyPrompt) dom.btnMobModalCopyPrompt.classList.add('copied');
         setTimeout(() => {
-          dom.btnModalCopyLabel.textContent = 'Copy';
+          dom.btnModalCopyLabel.textContent = 'Copy Prompt';
           dom.btnModalCopyPrompt.classList.remove('copied');
           if (dom.lblMobModalCopy) dom.lblMobModalCopy.textContent = 'Copy';
           if (dom.btnMobModalCopyPrompt) dom.btnMobModalCopyPrompt.classList.remove('copied');
@@ -5215,8 +6642,19 @@ Looking forward to welcoming you! Thank you.`);
     }
 
     // Mobile Studio Tools Bottom Sheet Handlers
+    const mobileToolsCard = dom.mobileToolsSheet
+      ? dom.mobileToolsSheet.querySelector('.mobile-bottom-sheet-card')
+      : null;
+
+    function resetMobileSheetTransform() {
+      if (!mobileToolsCard) return;
+      mobileToolsCard.style.transition = '';
+      mobileToolsCard.style.transform = '';
+    }
+
     function openMobileToolsSheet() {
       if (!dom.mobileToolsSheet) return;
+      resetMobileSheetTransform();
       updateHeaderAiIndicator();
       updateOrdersBadge();
       updateCounters();
@@ -5229,6 +6667,7 @@ Looking forward to welcoming you! Thank you.`);
     }
     function closeMobileToolsSheet() {
       if (!dom.mobileToolsSheet) return;
+      resetMobileSheetTransform();
       dom.mobileToolsSheet.classList.remove('active');
       if (!state.activeModalPin) {
         document.body.style.overflow = '';
@@ -5243,6 +6682,41 @@ Looking forward to welcoming you! Thank you.`);
     }
     if (dom.mobSheetDragClose) {
       dom.mobSheetDragClose.addEventListener('click', closeMobileToolsSheet);
+    }
+    if (mobileToolsCard) {
+      let sheetTouchStartY = 0;
+      let sheetTouchDeltaY = 0;
+      let sheetDragging = false;
+      mobileToolsCard.addEventListener('touchstart', (e) => {
+        if (!e.touches || e.touches.length !== 1) return;
+        if (mobileToolsCard.scrollTop > 4) return;
+        sheetTouchStartY = e.touches[0].clientY;
+        sheetTouchDeltaY = 0;
+        sheetDragging = true;
+        mobileToolsCard.style.transition = 'none';
+      }, { passive: true });
+      mobileToolsCard.addEventListener('touchmove', (e) => {
+        if (!sheetDragging || !e.touches || e.touches.length !== 1) return;
+        const delta = e.touches[0].clientY - sheetTouchStartY;
+        if (delta > 0 && mobileToolsCard.scrollTop <= 4) {
+          sheetTouchDeltaY = delta;
+          mobileToolsCard.style.transform = `translateY(${Math.min(delta, 240)}px)`;
+        } else {
+          sheetTouchDeltaY = 0;
+          mobileToolsCard.style.transform = '';
+        }
+      }, { passive: true });
+      mobileToolsCard.addEventListener('touchend', () => {
+        if (!sheetDragging) return;
+        sheetDragging = false;
+        if (sheetTouchDeltaY > 72) {
+          closeMobileToolsSheet();
+        } else {
+          mobileToolsCard.style.transition = 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
+          mobileToolsCard.style.transform = '';
+          setTimeout(resetMobileSheetTransform, 220);
+        }
+      });
     }
     if (dom.mobileToolsSheet) {
       dom.mobileToolsSheet.addEventListener('click', (e) => {
@@ -5383,6 +6857,7 @@ Looking forward to welcoming you! Thank you.`);
         else if (dom.shopOrdersModal && dom.shopOrdersModal.classList.contains('active')) closeShopOrdersModal();
         else if (dom.shopJobSlipModal && dom.shopJobSlipModal.classList.contains('active')) closeJobSlipModal();
         else if (dom.fullscreenLightbox.classList.contains('active')) closeLightbox();
+        else if (dom.pinSharePopover && dom.pinSharePopover.style.display !== 'none') closePinSharePopover();
         else if (dom.pinDetailModal.classList.contains('active')) closePinModal();
       }
 
@@ -5398,6 +6873,11 @@ Looking forward to welcoming you! Thank you.`);
       const hash = window.location.hash || '';
       if (hash.startsWith('#receipt')) {
         checkAndOpenReceiptFromUrl();
+        return;
+      }
+      if (/^#pin(?:\/|=)/i.test(hash)) {
+        const pinIdFromHash = getPinIdFromUrl();
+        if (pinIdFromHash) void openPinByDeepLink(pinIdFromHash);
         return;
       }
       if (document.body.classList.contains('receipt-portal-active')) {
@@ -5468,6 +6948,7 @@ Looking forward to welcoming you! Thank you.`);
       return;
     }
 
+    const initialPinDeepLink = getPinIdFromUrl();
     const initialHash = window.location.hash.replace('#', '');
     if (['terms', 'privacy', 'contact'].includes(initialHash)) {
       switchView('home');
@@ -5476,6 +6957,10 @@ Looking forward to welcoming you! Thank you.`);
       switchView(initialHash);
     } else {
       switchView('home');
+    }
+
+    if (initialPinDeepLink) {
+      void openPinByDeepLink(initialPinDeepLink);
     }
   }
 

@@ -286,6 +286,7 @@ export class StudioCloudSync {
     this.adminPollTimer = null;
     this.inFlightStyleRequests = new Map();
     this.lastStylePromptUnlocked = null;
+    this.pinBadges = {};
   }
 
   async getSessionJwt() {
@@ -842,11 +843,16 @@ export class StudioCloudSync {
         const styles = Array.isArray(data?.styles)
           ? data.styles.map(normalizeClientStyle).filter(Boolean)
           : [];
+        const pinBadges = (data?.pinBadges && typeof data.pinBadges === 'object') ? data.pinBadges : null;
+        if (pinBadges) {
+          this.pinBadges = { ...pinBadges };
+        }
         const promptUnlocked = Boolean(data?.promptUnlocked);
         this.lastStylePromptUnlocked = promptUnlocked;
         return {
           ok: true,
           styles,
+          pinBadges,
           hasMore: Boolean(data?.hasMore),
           nextOffset: Number.isFinite(Number(data?.nextOffset)) ? Number(data.nextOffset) : (offset + styles.length),
           limit,
@@ -855,7 +861,7 @@ export class StudioCloudSync {
         };
       } catch (err) {
         console.warn('fetchSharedStyles failed:', err);
-        return { ok: false, styles: null, hasMore: false, nextOffset: offset, promptUnlocked: false };
+        return { ok: false, styles: null, pinBadges: null, hasMore: false, nextOffset: offset, promptUnlocked: false };
       } finally {
         if (timer) clearTimeout(timer);
         this.inFlightStyleRequests.delete(requestKey);
@@ -864,6 +870,70 @@ export class StudioCloudSync {
 
     this.inFlightStyleRequests.set(requestKey, promise);
     return promise;
+  }
+
+  async fetchPinBadges() {
+    try {
+      const res = await fetch('/api/pin-badges', { method: 'GET' });
+      if (!res.ok) return { ok: false, badges: null };
+      const data = await res.json();
+      if (data?.ok && data.badges && typeof data.badges === 'object') {
+        this.pinBadges = { ...data.badges };
+        return { ok: true, badges: this.pinBadges };
+      }
+      return { ok: false, badges: null };
+    } catch (err) {
+      console.warn('fetchPinBadges failed:', err);
+      return { ok: false, badges: null };
+    }
+  }
+
+  async savePinBadge({ pinId, label = '', tone = 'crimson', remove = false } = {}) {
+    if (!this.user || !this.isAdmin()) {
+      return { ok: false, error: 'Managing spotlight badges is restricted to Studio Admin' };
+    }
+    const res = await this.apiFetch('/api/pin-badges', {
+      method: 'POST',
+      body: { pinId: String(pinId), label, tone, remove }
+    });
+    if (!res.ok) {
+      return { ok: false, error: res.data?.error || 'Failed to save badge' };
+    }
+    if (res.data?.badges && typeof res.data.badges === 'object') {
+      this.pinBadges = { ...res.data.badges };
+    }
+    return {
+      ok: true,
+      pinId: String(pinId),
+      badge: res.data?.badge || null,
+      badges: this.pinBadges
+    };
+  }
+
+  async fetchSharedStyleById(styleId) {
+    const cleanId = String(styleId || '').trim();
+    if (!cleanId) return null;
+    try {
+      const headers = {};
+      if (this.user) {
+        const token = await this.getSessionJwt();
+        if (token) headers.Authorization = `Bearer ${token}`;
+      }
+      const res = await fetch(`/api/styles?id=${encodeURIComponent(cleanId)}&limit=1`, {
+        method: 'GET',
+        headers
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data?.pinBadges && typeof data.pinBadges === 'object') {
+        this.pinBadges = { ...data.pinBadges };
+      }
+      const first = Array.isArray(data?.styles) && data.styles[0] ? data.styles[0] : null;
+      return first ? normalizeClientStyle(first) : null;
+    } catch (err) {
+      console.warn('fetchSharedStyleById failed:', err);
+      return null;
+    }
   }
 
   async bootstrapCloudState() {
@@ -907,6 +977,7 @@ export class StudioCloudSync {
         if (typeof this.callbacks.onCloudBootstrap === 'function') {
           await this.callbacks.onCloudBootstrap({
             styles: sharedStylesRes.ok ? sharedStylesRes.styles : null,
+            pinBadges: sharedStylesRes.ok ? sharedStylesRes.pinBadges : null,
             stylesPageMeta: sharedStylesRes.ok ? {
               hasMore: sharedStylesRes.hasMore,
               nextOffset: sharedStylesRes.nextOffset,
@@ -922,6 +993,7 @@ export class StudioCloudSync {
         if (typeof this.callbacks.onCloudBootstrap === 'function') {
           await this.callbacks.onCloudBootstrap({
             styles: sharedStylesRes.ok ? sharedStylesRes.styles : null,
+            pinBadges: sharedStylesRes.ok ? sharedStylesRes.pinBadges : null,
             stylesPageMeta: sharedStylesRes.ok ? {
               hasMore: sharedStylesRes.hasMore,
               nextOffset: sharedStylesRes.nextOffset,

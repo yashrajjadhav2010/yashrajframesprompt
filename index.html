@@ -280,6 +280,7 @@
           <svg style="width: 14px; height: 14px;"><use href="#icon-close"></use></svg>
         </button>
       </div>
+      <button type="button" class="mobile-search-cancel-btn" id="btnMobileSearchCancel" aria-label="Cancel Search">Cancel</button>
 
       <!-- Right Action Icons -->
       <div class="header-right">
@@ -360,28 +361,48 @@
       <!-- VIEW 1: HOME & EXPLORE (PINTEREST MASONRY FEED) -->
       <section class="view-section active" id="view-home">
         <div class="feed-header-strip">
-          <h1 class="feed-title" id="feedTitleHeading">Explore Prompts & Styles</h1>
+          <div class="feed-title-group">
+            <h1 class="feed-title" id="feedTitleHeading">Explore Prompts &amp; Styles</h1>
+            <div class="feed-filter-info" id="feedCountInfo">
+              Showing <strong id="feedCountNumber">12</strong> styles · Curated Studio Presets
+            </div>
+          </div>
           <div class="feed-header-right">
+            <div class="feed-layout-toggle" id="feedLayoutToggle" role="group" aria-label="Gallery layout mode">
+              <button type="button" class="feed-layout-btn active" data-layout="masonry" id="btnLayoutMasonry" title="Organic waterfall masonry">
+                <svg style="width: 14px; height: 14px;"><use href="#icon-pin"></use></svg>
+                <span>Waterfall</span>
+              </button>
+              <button type="button" class="feed-layout-btn" data-layout="grid" id="btnLayoutGrid" title="Symmetrical 4:5 exhibition grid">
+                <svg style="width: 14px; height: 14px;"><use href="#icon-frame"></use></svg>
+                <span>Studio Grid</span>
+              </button>
+            </div>
+            <label class="feed-sort-wrap" for="feedSortSelect">
+              <select id="feedSortSelect" class="feed-sort-select" aria-label="Sort styles">
+                <option value="recent">Latest &amp; Featured</option>
+                <option value="featured_badges">Trending &amp; Tagged First</option>
+                <option value="title_asc">Title (A–Z)</option>
+                <option value="saved_first">Saved First</option>
+              </select>
+            </label>
             <button type="button" class="btn-mobile-quick-add" id="btnFeedAddStyle" title="Add custom style from phone or desktop">
               <svg style="width: 14px; height: 14px;"><use href="#icon-plus"></use></svg>
               <span>Add Style</span>
             </button>
-            <div class="feed-filter-info" id="feedCountInfo">
-              Showing <strong id="feedCountNumber">12</strong> Pins
-            </div>
           </div>
         </div>
 
         <!-- The Pinterest Waterfall Masonry Container -->
         <div class="pins-masonry" id="homePinsMasonry">
-          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 4 / 5;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 74%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 48%;"></span></div></div></article>
-          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 3 / 4;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 82%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 52%;"></span></div></div></article>
-          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 1 / 1;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 68%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 44%;"></span></div></div></article>
-          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 5 / 6;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 78%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 50%;"></span></div></div></article>
-          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 4 / 5;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 70%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 46%;"></span></div></div></article>
-          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 3 / 4;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 76%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 54%;"></span></div></div></article>
-          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 4 / 3;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 64%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 42%;"></span></div></div></article>
-          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 5 / 6;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 80%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-avatar studio-shimmer-surface"></span><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 48%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 4 / 5;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 74%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 48%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 3 / 4;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 82%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 52%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 1 / 1;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 68%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 44%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 5 / 6;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 78%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 50%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 4 / 5;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 70%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 46%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 3 / 4;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 76%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 54%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 4 / 3;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 64%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 42%;"></span></div></div></article>
+          <article class="pin-card pin-skeleton-card" aria-hidden="true"><div class="pin-media-container pin-skeleton-media studio-shimmer-surface" style="--pin-skeleton-ratio: 5 / 6;"></div><div class="pin-skeleton-info"><div class="pin-skeleton-line studio-shimmer-surface" style="width: 80%;"></div><div class="pin-skeleton-meta"><span class="pin-skeleton-line sm studio-shimmer-surface" style="width: 48%;"></span></div></div></article>
         </div>
         <div class="feed-scroll-skeleton-grid" id="homeScrollSkeletonGrid" aria-hidden="true" style="display: none;"></div>
         <div class="feed-scroll-sentinel" id="homeFeedSentinel" style="display: none;">
@@ -868,6 +889,67 @@
               </div>
             </aside>
           </div>
+
+          <!-- Pin Spotlight Tags Manager (Flipkart / Amazon Product Badges) -->
+          <div class="admin-badges-section" id="adminBadgesSection">
+            <div class="admin-panel-head">
+              <div>
+                <h3>Pin Spotlight Tags (Trending / Best Seller / Smashing Hit)</h3>
+                <span class="admin-panel-sub">Highlight selected studio pins with storefront corner badges visible to all visitors</span>
+              </div>
+              <span class="admin-badge-count-pill" id="adminBadgeActiveCount">0 tagged pins</span>
+            </div>
+
+            <div class="admin-badge-composer">
+              <div class="admin-badge-field">
+                <label for="adminBadgePinSelect">1. Choose Pin / Style</label>
+                <div class="admin-badge-pin-picker">
+                  <input type="text" id="adminBadgePinSearch" class="admin-search-input admin-badge-filter-input" placeholder="Filter styles..." autocomplete="off" />
+                  <select id="adminBadgePinSelect" class="admin-select admin-badge-select">
+                    <option value="">Select a pin...</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="admin-badge-field">
+                <label>2. Quick Preset or Custom Tag</label>
+                <div class="admin-badge-preset-row" id="adminBadgePresetRow">
+                  <button type="button" class="admin-badge-preset-btn" data-badge-label="Best Seller" data-badge-tone="amazon">Best Seller</button>
+                  <button type="button" class="admin-badge-preset-btn" data-badge-label="Trending" data-badge-tone="crimson">Trending</button>
+                  <button type="button" class="admin-badge-preset-btn" data-badge-label="Smashing Hit" data-badge-tone="flipkart">Smashing Hit</button>
+                  <button type="button" class="admin-badge-preset-btn" data-badge-label="Top Rated" data-badge-tone="gold">Top Rated</button>
+                  <button type="button" class="admin-badge-preset-btn" data-badge-label="Most Copied" data-badge-tone="emerald">Most Copied</button>
+                  <button type="button" class="admin-badge-preset-btn" data-badge-label="Studio Pick" data-badge-tone="violet">Studio Pick</button>
+                </div>
+              </div>
+
+              <div class="admin-badge-inputs-row">
+                <div class="admin-badge-field">
+                  <label for="txtAdminBadgeLabel">Badge Text (max 24 chars)</label>
+                  <input type="text" id="txtAdminBadgeLabel" class="admin-search-input admin-badge-text-input" maxlength="24" placeholder="e.g. Best Seller, Hot Deal..." />
+                </div>
+                <div class="admin-badge-field">
+                  <label for="selAdminBadgeTone">Badge Color Style</label>
+                  <select id="selAdminBadgeTone" class="admin-select">
+                    <option value="amazon">Amazon Amber (#1 Pick)</option>
+                    <option value="flipkart">Flipkart Royal Blue</option>
+                    <option value="crimson">Trending Crimson</option>
+                    <option value="gold">Studio Gold</option>
+                    <option value="emerald">Emerald Assured</option>
+                    <option value="violet">Royal Violet</option>
+                  </select>
+                </div>
+                <div class="admin-badge-composer-actions">
+                  <button type="button" class="admin-btn-primary" id="btnAdminApplyPinBadge">Apply Tag</button>
+                  <button type="button" class="admin-btn-secondary" id="btnAdminClearPinBadge">Remove Tag</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="admin-badged-pins-grid" id="adminBadgedPinsGrid">
+              <div class="admin-log-empty">No pins tagged yet. Pick any style above or open any pin card to attach a Best Seller / Trending tag.</div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -925,19 +1007,18 @@
             </div>
           </div>
           <div class="modal-img-bar">
-            <span>Click image to toggle 1.7x zoom</span>
-            <div style="display: flex; gap: 8px;">
-              <button class="pinterest-chip" id="btnModalBeforeAfterToggle" style="padding: 4px 12px; font-size: 0.78rem;">
-                <svg style="width: 13px; height: 13px; display: inline-block; vertical-align: -2px; margin-right: 4px;"><use href="#icon-split"></use></svg>
+            <div class="modal-img-bar-controls">
+              <button type="button" class="modal-media-tool-btn" id="btnModalBeforeAfterToggle">
+                <svg style="width: 14px; height: 14px;"><use href="#icon-split"></use></svg>
                 <span id="lblModalBeforeAfter">Before / After</span>
               </button>
-              <button class="pinterest-chip" id="btnModalZoom" style="padding: 4px 12px; font-size: 0.78rem;">
-                <svg style="width: 13px; height: 13px; display: inline-block; vertical-align: -2px; margin-right: 4px;"><use href="#icon-zoom-in"></use></svg>
-                Zoom
+              <button type="button" class="modal-media-tool-btn" id="btnModalZoom">
+                <svg style="width: 14px; height: 14px;"><use href="#icon-zoom-in"></use></svg>
+                <span>Zoom</span>
               </button>
-              <button class="pinterest-chip" id="btnModalLightbox" style="padding: 4px 12px; font-size: 0.78rem;">
-                <svg style="width: 13px; height: 13px; display: inline-block; vertical-align: -2px; margin-right: 4px;"><use href="#icon-maximize"></use></svg>
-                Fullscreen
+              <button type="button" class="modal-media-tool-btn" id="btnModalLightbox">
+                <svg style="width: 14px; height: 14px;"><use href="#icon-maximize"></use></svg>
+                <span>Fullscreen</span>
               </button>
             </div>
           </div>
@@ -945,39 +1026,66 @@
 
         <!-- Right: Pin Information & Prompt Box -->
         <div class="modal-pin-details-col">
-          <!-- Top Action Bar -->
+          <!-- Sticky Pinterest Top Action Bar -->
           <div class="modal-top-actions-bar">
             <div class="modal-left-icons">
-              <button class="modal-action-btn-circle" id="btnModalFav" title="Save to Favorites">
-                <svg style="width: 20px; height: 20px;"><use href="#icon-heart"></use></svg>
+              <button type="button" class="modal-action-btn-circle" id="btnModalFav" title="Save to Favorites">
+                <svg style="width: 19px; height: 19px;"><use href="#icon-heart"></use></svg>
               </button>
-              <button class="modal-action-btn-circle" id="btnModalShare" title="Copy Pin Link">
-                <svg style="width: 20px; height: 20px;"><use href="#icon-share"></use></svg>
+              <button type="button" class="modal-action-btn-circle" id="btnModalShare" title="Share Pin" aria-expanded="false" aria-controls="pinSharePopover">
+                <svg style="width: 19px; height: 19px;"><use href="#icon-share"></use></svg>
               </button>
-              <button class="modal-action-btn-circle modal-delete-style-btn" id="btnModalDeleteCustom" title="Delete Custom Style" style="display: none;">
-                <svg style="width: 19px; height: 19px;"><use href="#icon-trash"></use></svg>
+              <button type="button" class="modal-action-btn-circle modal-delete-style-btn" id="btnModalDeleteCustom" title="Delete Custom Style" style="display: none;">
+                <svg style="width: 18px; height: 18px;"><use href="#icon-trash"></use></svg>
               </button>
+
+              <!-- Share Pin Popover -->
+              <div class="pin-share-popover" id="pinSharePopover" role="dialog" aria-label="Share Style Link" style="display: none;">
+                <div class="pin-share-head">
+                  <span>Share This Style</span>
+                  <button type="button" class="pin-share-close-btn" id="btnCloseSharePopover" aria-label="Close share menu">
+                    <svg style="width: 14px; height: 14px;"><use href="#icon-close"></use></svg>
+                  </button>
+                </div>
+                <div class="pin-share-link-row">
+                  <input type="text" class="pin-share-url-input" id="inputSharePinUrl" readonly aria-label="Shareable style link" />
+                  <button type="button" class="pin-share-copy-btn" id="btnShareCopyLink">Copy</button>
+                </div>
+                <div class="pin-share-channels">
+                  <a class="pin-share-channel-btn" id="linkShareWhatsApp" href="#" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                  <a class="pin-share-channel-btn" id="linkShareTelegram" href="#" target="_blank" rel="noopener noreferrer">Telegram</a>
+                  <a class="pin-share-channel-btn" id="linkShareEmail" href="#">Email</a>
+                  <button type="button" class="pin-share-channel-btn" id="btnShareNativeTrigger" style="display: none;">More Apps</button>
+                </div>
+              </div>
             </div>
 
             <div class="modal-top-actions-right">
               <!-- View in Frame Simulator Button -->
-              <button class="btn-view-in-frame-large" id="btnModalViewInFrame" title="See how this artwork looks framed on the wall">
-                <svg style="width: 17px; height: 17px;"><use href="#icon-frame"></use></svg>
-                <span>View In Frame</span>
+              <button type="button" class="btn-view-in-frame-large" id="btnModalViewInFrame" title="See how this artwork looks framed on the wall">
+                <svg style="width: 15px; height: 15px;"><use href="#icon-frame"></use></svg>
+                <span>View Frame</span>
               </button>
 
               <!-- AI Auto Take Button -->
-              <button class="btn-ai-autotake-large" id="btnModalAutoTake" title="Send prompt directly to your AI app without copying">
-                <svg style="width: 17px; height: 17px;"><use href="#icon-sparkles"></use></svg>
+              <button type="button" class="btn-ai-autotake-large" id="btnModalAutoTake" title="Send prompt directly to your AI app without copying">
+                <svg style="width: 15px; height: 15px;"><use href="#icon-sparkles"></use></svg>
                 <span>AI Auto Take</span>
               </button>
 
               <!-- Iconic Pinterest Red Save / Copy Button -->
-              <button class="btn-pinterest-save-large" id="btnModalCopyPrompt">
-                <svg style="width: 17px; height: 17px;"><use href="#icon-copy"></use></svg>
-                <span id="btnModalCopyLabel">Copy</span>
+              <button type="button" class="btn-pinterest-save-large" id="btnModalCopyPrompt">
+                <svg style="width: 15px; height: 15px;"><use href="#icon-copy"></use></svg>
+                <span id="btnModalCopyLabel">Copy Prompt</span>
               </button>
             </div>
+          </div>
+
+          <div class="modal-details-scroll" id="modalDetailsScroll">
+
+          <!-- Storefront Spotlight Ribbon (if assigned by Admin) -->
+          <div class="modal-spotlight-badge-row" id="modalSpotlightBadgeRow" style="display: none;">
+            <span class="pin-spotlight-badge tone-crimson" id="modalSpotlightBadge"></span>
           </div>
 
           <!-- Pin Title -->
@@ -1000,12 +1108,43 @@
             <!-- Rendered dynamically -->
           </div>
 
+          <!-- Admin-Only Inline Spotlight Badge Tagger (Strictly Admin Email) -->
+          <div class="modal-admin-badge-bar" id="modalAdminBadgeBar" style="display: none;">
+            <div class="modal-admin-badge-head">
+              <div class="modal-admin-badge-title">
+                <svg style="width: 14px; height: 14px; color: var(--accent-gold);"><use href="#icon-sparkles"></use></svg>
+                <span>Admin Spotlight Tag</span>
+              </div>
+              <button type="button" class="modal-admin-badge-clear" id="btnModalAdminBadgeClear" style="display: none;">Remove Tag</button>
+            </div>
+            <div class="modal-admin-badge-presets" id="modalAdminBadgePresets">
+              <button type="button" class="modal-badge-chip" data-badge-label="Best Seller" data-badge-tone="amazon">Best Seller</button>
+              <button type="button" class="modal-badge-chip" data-badge-label="Trending" data-badge-tone="crimson">Trending</button>
+              <button type="button" class="modal-badge-chip" data-badge-label="Smashing Hit" data-badge-tone="flipkart">Smashing Hit</button>
+              <button type="button" class="modal-badge-chip" data-badge-label="Top Rated" data-badge-tone="gold">Top Rated</button>
+              <button type="button" class="modal-badge-chip" data-badge-label="Most Copied" data-badge-tone="emerald">Most Copied</button>
+              <button type="button" class="modal-badge-chip" data-badge-label="Studio Pick" data-badge-tone="violet">Studio Pick</button>
+            </div>
+            <div class="modal-admin-badge-custom-row">
+              <input type="text" id="txtModalAdminBadgeLabel" class="modal-admin-badge-input" maxlength="24" placeholder="Custom tag (e.g. Festive Hit)..." />
+              <select id="selModalAdminBadgeTone" class="modal-admin-badge-tone-select" aria-label="Badge color tone">
+                <option value="amazon">Amber</option>
+                <option value="flipkart">Blue</option>
+                <option value="crimson">Red</option>
+                <option value="gold">Gold</option>
+                <option value="emerald">Green</option>
+                <option value="violet">Violet</option>
+              </select>
+              <button type="button" class="modal-admin-badge-apply" id="btnModalAdminBadgeApply">Apply</button>
+            </div>
+          </div>
+
           <!-- Smart Prompt Mixer / Variable Tuner (Editor Mode) -->
           <div class="modal-customizer-card" id="pinPromptCustomizer">
             <div class="customizer-header" id="btnToggleCustomizer">
               <div class="customizer-header-title">
                 <svg style="width: 15px; height: 15px; color: var(--accent-gold);"><use href="#icon-sliders"></use></svg>
-                <span>Smart Prompt Mixer (Customize For Client)</span>
+                <span>Smart Prompt Mixer</span>
               </div>
               <span class="customizer-toggle-arrow" id="customizerToggleArrow">▾</span>
             </div>
@@ -1058,10 +1197,30 @@
             </div>
           </div>
 
+          <!-- Auto-Fill Prompt Placeholders (Name, Date, Age, Custom Text) -->
+          <div class="modal-vars-card" id="modalVarsCard" style="display: none;">
+            <div class="modal-vars-header">
+              <div class="modal-vars-title-wrap">
+                <svg style="width: 14px; height: 14px; color: var(--accent-gold);"><use href="#icon-sparkles"></use></svg>
+                <span class="modal-vars-title">Auto-Fill Client Details</span>
+                <span class="modal-vars-count" id="lblModalVarsBadge">Live Sync</span>
+              </div>
+              <div class="modal-vars-actions">
+                <button type="button" class="modal-vars-btn" id="btnModalVarsClear" title="Reset placeholder fields">Clear</button>
+                <button type="button" class="modal-vars-btn" id="btnModalVarsToggle" aria-expanded="true">Hide</button>
+              </div>
+            </div>
+            <div class="modal-vars-body" id="modalVarsBody">
+              <div class="modal-vars-grid" id="modalVarsGrid">
+                <!-- Dynamic variable inputs injected per prompt -->
+              </div>
+            </div>
+          </div>
+
           <!-- Prompt Card (Visible in Studio Mode) -->
           <div class="modal-prompt-card" id="modalPromptCard">
             <div class="modal-prompt-header">
-              <span>AI EDITING PROMPT</span>
+              <span>AI Editing Prompt</span>
               <span id="modalPromptCounts">0 words · 0 chars</span>
             </div>
             <pre class="modal-prompt-body" id="modalPromptText"></pre>
@@ -1105,9 +1264,10 @@
           </div>
 
           <!-- More Like This Hint -->
-          <div class="modal-verified-footer-row" style="margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted);">
-            <span>Yashraj Frames AI Studio Production Preset</span>
-            <span style="color: var(--accent-gold); font-weight: 600;">Verified Prompt</span>
+          <div class="modal-verified-footer-row">
+            <span>Yashraj Frames AI Studio Preset</span>
+            <span class="modal-verified-badge">Verified Prompt</span>
+          </div>
           </div>
         </div>
 
@@ -1553,6 +1713,35 @@
             <label for="txtNewStyleTags">Search Tags (comma separated)</label>
             <input type="text" id="txtNewStyleTags" class="slip-input" placeholder="wedding, royal, golden hour, lehenga, studio" />
           </div>
+
+          <div class="slip-form-group">
+            <label for="selNewStyleBadgePreset">Spotlight Tag (Optional)</label>
+            <select id="selNewStyleBadgePreset" class="slip-select">
+              <option value="">None</option>
+              <option value="Best Seller|amazon">Best Seller (Amazon Amber)</option>
+              <option value="Trending|crimson">Trending (Crimson Red)</option>
+              <option value="Smashing Hit|flipkart">Smashing Hit (Flipkart Blue)</option>
+              <option value="Top Rated|gold">Top Rated (Studio Gold)</option>
+              <option value="Most Copied|emerald">Most Copied (Emerald)</option>
+              <option value="Studio Pick|violet">Studio Pick (Royal Violet)</option>
+              <option value="__custom__">Custom Badge Label...</option>
+            </select>
+          </div>
+
+          <div class="slip-form-group" id="newStyleCustomBadgeGroup" style="display: none;">
+            <label for="txtNewStyleBadgeCustom">Custom Spotlight Label &amp; Color</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="txtNewStyleBadgeCustom" class="slip-input" maxlength="24" placeholder="e.g. Festive Hit" style="flex: 1;" />
+              <select id="selNewStyleBadgeTone" class="slip-select" style="width: 112px;">
+                <option value="amazon">Amber</option>
+                <option value="flipkart">Blue</option>
+                <option value="crimson">Red</option>
+                <option value="gold">Gold</option>
+                <option value="emerald">Green</option>
+                <option value="violet">Violet</option>
+              </select>
+            </div>
+          </div>
         </form>
 
         <div class="job-slip-actions-bar" style="border-top: 1px solid var(--border-dark); padding-top: 16px; margin-top: 16px;">
@@ -1635,8 +1824,8 @@
             <h2 class="mobile-sheet-title" id="mobToolsTitle">Studio Tools &amp; Shop Menu</h2>
             <p class="mobile-sheet-sub">Yashraj Frames · Quick Mobile Controls</p>
           </div>
-          <button type="button" class="modal-floating-close-btn" id="mobToolsCloseBtn" style="position: static; width: 38px; height: 38px;" aria-label="Close Studio Tools">
-            <svg style="width: 16px; height: 16px;"><use href="#icon-close"></use></svg>
+          <button type="button" class="modal-floating-close-btn mob-sheet-close-btn" id="mobToolsCloseBtn" aria-label="Close Studio Tools">
+            <svg style="width: 18px; height: 18px;"><use href="#icon-close"></use></svg>
           </button>
         </div>
 
@@ -2190,7 +2379,7 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- PINTEREST MOBILE BOTTOM BAR -->
-    <nav class="mobile-bottom-nav">
+    <nav class="mobile-bottom-nav" aria-label="Primary Mobile Navigation">
       <button class="mobile-nav-item active" data-view="home" id="mob-home">
         <svg style="width: 22px; height: 22px;"><use href="#icon-home"></use></svg>
         <span>Home</span>
