@@ -775,6 +775,7 @@ export class StudioCloudSync {
       orderLimit: Number(this.subscription?.order_limit) || base.orderLimit,
       promptCopyCount: Number(this.subscription?.prompt_copy_count ?? pubMeta.promptCopyCount) || 0,
       aiRedirectCount: Number(this.subscription?.ai_redirect_count ?? pubMeta.aiRedirectCount) || 0,
+      freeTrialUsed: Number(this.subscription?.free_trial_used ?? pubMeta.freeTrialUsed) || 0,
       lastPromptTitle: this.subscription?.last_prompt_title || pubMeta.lastPromptTitle || '',
       adminNote: this.subscription?.admin_note || pubMeta.adminNote || '',
       approvedAt: this.subscription?.approved_at || pubMeta.approvedAt || null,
@@ -1085,7 +1086,7 @@ export class StudioCloudSync {
     await this.unsubscribeAdminRealtime();
   }
 
-  async recordPromptUsage({ pinId = null, pinTitle = '', category = '', actionType = 'copy', aiTarget = null } = {}) {
+  async recordPromptUsage({ pinId = null, pinTitle = '', category = '', actionType = 'copy', aiTarget = null, isTrial = false } = {}) {
     if (!this.user) return { ok: false };
     const isRedirect = actionType === 'ai_redirect';
 
@@ -1096,13 +1097,17 @@ export class StudioCloudSync {
         pinTitle: pinTitle || '',
         category: category || '',
         actionType: isRedirect ? 'ai_redirect' : 'copy',
-        aiTarget: aiTarget || null
+        aiTarget: aiTarget || null,
+        isTrial: Boolean(isTrial)
       }
     });
 
     if (res.status === 403 && res.data?.locked) {
       if (!this.subscription) this.subscription = {};
       this.subscription.plan_status = res.data.status || 'paused';
+      if (typeof res.data.freeTrialUsed === 'number') {
+        this.subscription.free_trial_used = res.data.freeTrialUsed;
+      }
       this.notifyAuthChange();
       return { ok: false, locked: true };
     }
@@ -1110,10 +1115,47 @@ export class StudioCloudSync {
     if (res.ok && this.subscription) {
       this.subscription.prompt_copy_count = Number(res.data.promptCopyCount) || this.subscription.prompt_copy_count;
       this.subscription.ai_redirect_count = Number(res.data.aiRedirectCount) || this.subscription.ai_redirect_count;
+      if (typeof res.data.freeTrialUsed === 'number') {
+        this.subscription.free_trial_used = res.data.freeTrialUsed;
+      }
       if (pinTitle) this.subscription.last_prompt_title = pinTitle;
       this.subscription.last_active_at = new Date().toISOString();
     }
-    return { ok: res.ok };
+    return { ok: res.ok, freeTrialUsed: res.data?.freeTrialUsed };
+  }
+
+  async unlockTrialPrompt({ styleId, actionType = 'copy', aiTarget = null } = {}) {
+    if (!styleId) return { ok: false, error: 'Missing styleId' };
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (this.user) {
+        const token = await this.getClerkSessionToken();
+        if (token) headers.Authorization = `Bearer ${token}`;
+      }
+      const resp = await fetch('/api/trial/unlock-prompt', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          styleId: String(styleId),
+          actionType: actionType === 'ai_redirect' ? 'ai_redirect' : 'copy',
+          aiTarget: aiTarget || null
+        })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && this.subscription && typeof data.freeTrialUsed === 'number') {
+        this.subscription.free_trial_used = data.freeTrialUsed;
+      }
+      return {
+        ok: resp.ok && Boolean(data.ok),
+        status: resp.status,
+        prompt: data.prompt || '',
+        freeTrialUsed: typeof data.freeTrialUsed === 'number' ? data.freeTrialUsed : null,
+        trialExhausted: Boolean(data.trialExhausted),
+        error: data.error || ''
+      };
+    } catch (err) {
+      return { ok: false, error: err?.message || 'Network error' };
+    }
   }
 
   async requestSubscriptionUpgrade(planTier) {

@@ -430,6 +430,7 @@ function buildMergedSubscriber(clerkUser, supaRow = null, styleCount = 0, orderC
     order_limit: Number(supaRow?.order_limit) || limits.orderLimit,
     prompt_copy_count: copyCount,
     ai_redirect_count: redirectCount,
+    free_trial_used: Number(meta.freeTrialUsed) || 0,
     last_prompt_title: (typeof meta.lastPromptTitle === 'string' ? meta.lastPromptTitle : '') || (typeof supaRow?.last_prompt_title === 'string' ? supaRow.last_prompt_title : ''),
     last_active_at: lastActiveMs ? new Date(lastActiveMs).toISOString() : new Date().toISOString(),
     created_at: clerkUser.created_at ? new Date(clerkUser.created_at).toISOString() : (typeof supaRow?.created_at === 'string' ? supaRow.created_at : new Date().toISOString()),
@@ -728,6 +729,122 @@ export async function handleStudioApiRequest(req, res) {
     return true;
   }
 
+  // Free-trial on-demand prompt unlock (called after completing the 21s unskippable ad)
+  if (pathname === '/api/trial/unlock-prompt' && method === 'POST') {
+    const FREE_TRIAL_LIMIT = 5;
+    const body = await readJsonBody(req);
+    const styleId = String(body?.styleId ?? '').trim();
+    const actionType = body?.actionType === 'ai_redirect' ? 'ai_redirect' : 'copy';
+    const aiTarget = body?.aiTarget ? String(body.aiTarget).slice(0, 40) : null;
+
+    if (!styleId || !/^[a-zA-Z0-9_-]{1,64}$/.test(styleId)) {
+      sendJson(res, 400, { ok: false, error: 'Valid styleId is required.' });
+      return true;
+    }
+
+    let authedUser = null;
+    let isPaidUser = false;
+    let freeTrialUsed = null;
+    const authHeader = String(req.headers.authorization || '');
+    if (authHeader.startsWith('Bearer ')) {
+      const maybeAuth = await authenticateRequest(req);
+      if (maybeAuth.ok) {
+        authedUser = maybeAuth.user;
+        if (maybeAuth.isAdmin) {
+          isPaidUser = true;
+        } else {
+          const subRes = await supaRest(
+            `user_subscriptions?user_id=eq.${encodeURIComponent(maybeAuth.user.id)}&select=plan_status,current_period_end`
+          );
+          const supaRow = Array.isArray(subRes.data) && subRes.data[0] ? subRes.data[0] : null;
+          const merged = buildMergedSubscriber(maybeAuth.user, supaRow);
+          if (merged.plan_status === 'active') {
+            isPaidUser = true;
+          } else if (merged.plan_status === 'paused' || merged.is_expired) {
+            sendJson(res, 403, {
+              ok: false,
+              locked: true,
+              status: merged.plan_status,
+              error: merged.is_expired
+                ? 'Your access validity period has expired. Please contact Studio Admin to renew.'
+                : 'Prompt access is currently paused by Studio Admin.'
+            });
+            return true;
+          } else {
+            const currentMeta = (maybeAuth.user.public_metadata && typeof maybeAuth.user.public_metadata === 'object')
+              ? maybeAuth.user.public_metadata
+              : {};
+            const usedSoFar = Number(currentMeta.freeTrialUsed) || 0;
+            if (usedSoFar >= FREE_TRIAL_LIMIT) {
+              sendJson(res, 403, {
+                ok: false,
+                trialExhausted: true,
+                freeTrialUsed: usedSoFar,
+                error: 'All 5 free trial prompt unlocks have been used. Request Yashraj Pro approval for unlimited access.'
+              });
+              return true;
+            }
+            freeTrialUsed = usedSoFar;
+          }
+        }
+      }
+    }
+
+    const adminDir = await resolveAdminDirectory(false);
+    const adminIds = adminDir.ids || null;
+    const styleRes = await supaRest(
+      `studio_styles?id=eq.${encodeURIComponent(styleId)}&select=id,user_id,title,category,prompt&limit=1`
+    );
+    const row = Array.isArray(styleRes.data) && styleRes.data[0] ? styleRes.data[0] : null;
+    if (!row || (adminIds && adminIds.size > 0 && !adminIds.has(row.user_id))) {
+      sendJson(res, 404, { ok: false, error: 'Style not found in studio catalog.' });
+      return true;
+    }
+
+    if (authedUser && !isPaidUser) {
+      const currentMeta = (authedUser.public_metadata && typeof authedUser.public_metadata === 'object')
+        ? authedUser.public_metadata
+        : {};
+      const nextTrialUsed = (Number(currentMeta.freeTrialUsed) || 0) + 1;
+      const nowIso = new Date().toISOString();
+      const prevLogs = Array.isArray(currentMeta.recentPromptLogs) ? currentMeta.recentPromptLogs : [];
+      const newLog = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        user_id: authedUser.id,
+        email: getClerkPrimaryEmail(authedUser),
+        pin_id: Number(row.id) || null,
+        pin_title: `${String(row.title || 'Studio Prompt').slice(0, 100)} (Free Trial)`,
+        category: String(row.category || 'Studio').slice(0, 60),
+        action_type: actionType,
+        ai_target: aiTarget,
+        created_at: nowIso
+      };
+      const nextMeta = {
+        ...currentMeta,
+        freeTrialUsed: nextTrialUsed,
+        promptCopyCount: (Number(currentMeta.promptCopyCount) || 0) + (actionType === 'copy' ? 1 : 0),
+        aiRedirectCount: (Number(currentMeta.aiRedirectCount) || 0) + (actionType === 'ai_redirect' ? 1 : 0),
+        lastPromptTitle: String(row.title || 'Studio Prompt').slice(0, 120),
+        lastActiveAt: nowIso,
+        recentPromptLogs: [newLog, ...prevLogs].slice(0, 25)
+      };
+      await clerkRequest(`/users/${encodeURIComponent(authedUser.id)}/metadata`, {
+        method: 'PATCH',
+        body: JSON.stringify({ public_metadata: nextMeta })
+      });
+      freeTrialUsed = nextTrialUsed;
+    }
+
+    sendJson(res, 200, {
+      ok: true,
+      styleId: Number(row.id),
+      prompt: row.prompt || '',
+      freeTrialUsed: freeTrialUsed,
+      freeTrialLimit: FREE_TRIAL_LIMIT
+    });
+    return true;
+  }
+
   const auth = await authenticateRequest(req);
   if (!auth.ok) {
     sendJson(res, auth.status, { ok: false, error: auth.error });
@@ -853,17 +970,31 @@ export async function handleStudioApiRequest(req, res) {
     return true;
   }
 
-  // 3. Track prompt copy or AI Auto Take redirect (blocks paused/pending users server-side!)
+  // 3. Track prompt copy or AI Auto Take redirect (allows up to 5 free trial uses for pending accounts, blocks paused/expired)
   if (pathname === '/api/telemetry/track' && method === 'POST') {
+    const FREE_TRIAL_LIMIT = 5;
     const body = await readJsonBody(req);
     const currentMerged = buildMergedSubscriber(auth.user, null);
+    const currentMeta = (auth.user.public_metadata && typeof auth.user.public_metadata === 'object')
+      ? auth.user.public_metadata
+      : {};
+    const isTrialRequest = Boolean(body?.isTrial);
+    const prevTrialUsed = Number(currentMeta.freeTrialUsed) || 0;
+    const allowAsFreeTrial = (
+      !auth.isAdmin &&
+      currentMerged.plan_status === 'pending' &&
+      !currentMerged.is_expired &&
+      isTrialRequest &&
+      prevTrialUsed < FREE_TRIAL_LIMIT
+    );
 
-    if (!auth.isAdmin && currentMerged.plan_status !== 'active') {
+    if (!auth.isAdmin && currentMerged.plan_status !== 'active' && !allowAsFreeTrial) {
       sendJson(res, 403, {
         ok: false,
         locked: true,
         expired: Boolean(currentMerged.is_expired),
         status: currentMerged.plan_status,
+        freeTrialUsed: prevTrialUsed,
         error: currentMerged.is_expired
           ? 'Your access validity period has expired. Please contact Studio Admin to renew.'
           : 'Prompt access is locked until approved by Studio Admin.'
@@ -878,16 +1009,13 @@ export async function handleStudioApiRequest(req, res) {
     const aiTarget = body.aiTarget ? String(body.aiTarget).slice(0, 40) : null;
     const nowIso = new Date().toISOString();
 
-    const currentMeta = (auth.user.public_metadata && typeof auth.user.public_metadata === 'object')
-      ? auth.user.public_metadata
-      : {};
     const prevLogs = Array.isArray(currentMeta.recentPromptLogs) ? currentMeta.recentPromptLogs : [];
     const newLog = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       user_id: auth.user.id,
       email: getClerkPrimaryEmail(auth.user),
       pin_id: pinId,
-      pin_title: pinTitle,
+      pin_title: allowAsFreeTrial ? `${pinTitle.slice(0, 104)} (Free Trial)` : pinTitle,
       category,
       action_type: actionType,
       ai_target: aiTarget,
@@ -896,6 +1024,7 @@ export async function handleStudioApiRequest(req, res) {
 
     const nextCopyCount = (Number(currentMeta.promptCopyCount) || 0) + (actionType === 'copy' ? 1 : 0);
     const nextRedirectCount = (Number(currentMeta.aiRedirectCount) || 0) + (actionType === 'ai_redirect' ? 1 : 0);
+    const nextTrialUsed = allowAsFreeTrial ? (prevTrialUsed + 1) : prevTrialUsed;
 
     const nextMeta = {
       ...currentMeta,
@@ -903,6 +1032,7 @@ export async function handleStudioApiRequest(req, res) {
       planStatus: currentMerged.plan_status,
       promptCopyCount: nextCopyCount,
       aiRedirectCount: nextRedirectCount,
+      freeTrialUsed: nextTrialUsed,
       lastPromptTitle: pinTitle,
       lastActiveAt: nowIso,
       recentPromptLogs: [newLog, ...prevLogs].slice(0, 25)
@@ -917,6 +1047,7 @@ export async function handleStudioApiRequest(req, res) {
       ok: true,
       promptCopyCount: nextCopyCount,
       aiRedirectCount: nextRedirectCount,
+      freeTrialUsed: nextTrialUsed,
       lastPromptTitle: pinTitle
     });
     return true;

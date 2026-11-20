@@ -24,8 +24,13 @@ import { initPwaSupport } from './src/lib/pwa.js';
     PIN_BADGES: 'yashraj_pin_badges',
     SHOP_ORDERS: 'yashraj_shop_orders',
     SHOP_CONTACT: 'yashraj_shop_contact',
-    FEED_LAYOUT: 'yashraj_feed_layout'
+    FEED_LAYOUT: 'yashraj_feed_layout',
+    FREE_TRIAL_USES: 'yashraj_free_trial_uses_v1'
   };
+
+  const FREE_TRIAL_LIMIT = 5;
+  const AD_GATE_DURATION_SEC = 21;
+  const FREE_TRIAL_COOKIE_NAME = 'yashraj_ft_u';
 
   function cleanPromptForAi(text) {
     if (!text) return '';
@@ -162,6 +167,21 @@ import { initPwaSupport } from './src/lib/pwa.js';
       loading: false,
       queryKey: 'All||',
       page0Cache: new Map()
+    },
+    freeTrialUsed: 0,
+    trialUnlockedPinIds: new Set(),
+    adGate: {
+      active: false,
+      completed: false,
+      timerId: null,
+      elapsedMs: 0,
+      lastTickAt: 0,
+      fallbackMode: false,
+      muted: true,
+      pendingPayload: null,
+      resolvedPrompt: '',
+      resolvedUrl: '',
+      resolvePromise: null
     }
   };
 
@@ -290,6 +310,8 @@ import { initPwaSupport } from './src/lib/pwa.js';
     badgeSavedCount: document.getElementById('badge-saved-count'),
     feedCountNumber: document.getElementById('feedCountNumber'),
     feedTitleHeading: document.getElementById('feedTitleHeading'),
+    feedFreeTrialPill: document.getElementById('feedFreeTrialPill'),
+    lblFeedFreeTrialText: document.getElementById('lblFeedFreeTrialText'),
     profileSavedCount: document.getElementById('profileSavedCount'),
     profileHistoryCount: document.getElementById('profileHistoryCount'),
 
@@ -371,6 +393,32 @@ import { initPwaSupport } from './src/lib/pwa.js';
     modalPromptCard: document.getElementById('modalPromptCard'),
     modalPromptCounts: document.getElementById('modalPromptCounts'),
     modalPromptText: document.getElementById('modalPromptText'),
+    modalFreeTrialBanner: document.getElementById('modalFreeTrialBanner'),
+    lblModalFreeTrialCount: document.getElementById('lblModalFreeTrialCount'),
+    btnModalTrialUpgrade: document.getElementById('btnModalTrialUpgrade'),
+    modalPromptTrialOverlay: document.getElementById('modalPromptTrialOverlay'),
+
+    // 21-Second Unskippable Ad Gate Modal Elements
+    studioAdGateModal: document.getElementById('studioAdGateModal'),
+    adGateTitle: document.getElementById('adGateTitle'),
+    btnAdGateMute: document.getElementById('btnAdGateMute'),
+    lblAdGateMuteText: document.getElementById('lblAdGateMuteText'),
+    lblAdGateCountdown: document.getElementById('lblAdGateCountdown'),
+    adGateVideoStage: document.getElementById('adGateVideoStage'),
+    adGateVideo: document.getElementById('adGateVideo'),
+    btnAdGateUnmutePrompt: document.getElementById('btnAdGateUnmutePrompt'),
+    adGateFallbackStage: document.getElementById('adGateFallbackStage'),
+    lblAdGateFallbackNote: document.getElementById('lblAdGateFallbackNote'),
+    adGateProgressFill: document.getElementById('adGateProgressFill'),
+    adGateRunningBar: document.getElementById('adGateRunningBar'),
+    lblAdGatePendingAction: document.getElementById('lblAdGatePendingAction'),
+    lblAdGateTrialHint: document.getElementById('lblAdGateTrialHint'),
+    adGateCompleteBar: document.getElementById('adGateCompleteBar'),
+    lblAdGateCompleteTitle: document.getElementById('lblAdGateCompleteTitle'),
+    lblAdGateCompleteSub: document.getElementById('lblAdGateCompleteSub'),
+    btnAdGateContinueAction: document.getElementById('btnAdGateContinueAction'),
+    linkAdGateOpenAi: document.getElementById('linkAdGateOpenAi'),
+    btnAdGateDone: document.getElementById('btnAdGateDone'),
 
     // Before / After Elements in Modal
     btnModalBeforeAfterToggle: document.getElementById('btnModalBeforeAfterToggle'),
@@ -614,6 +662,7 @@ import { initPwaSupport } from './src/lib/pwa.js';
       if (savedLayout === 'grid' || savedLayout === 'masonry') {
         state.feedLayout = savedLayout;
       }
+      state.freeTrialUsed = loadFreeTrialUsed();
       updateOrdersBadge();
     } catch (e) {
       console.warn('LocalStorage error', e);
@@ -903,6 +952,51 @@ import { initPwaSupport } from './src/lib/pwa.js';
     };
   }
 
+  function readFreeTrialCookie() {
+    try {
+      const cookies = String(document.cookie || '').split(';');
+      for (const item of cookies) {
+        const [k, v] = item.trim().split('=');
+        if (k === FREE_TRIAL_COOKIE_NAME) {
+          const parsed = Number(decodeURIComponent(v || '0'));
+          if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+        }
+      }
+    } catch {
+      // Ignore cookie errors
+    }
+    return 0;
+  }
+
+  function loadFreeTrialUsed() {
+    let localCount = 0;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.FREE_TRIAL_USES);
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed >= 0) localCount = parsed;
+    } catch {
+      // Ignore storage errors
+    }
+    const cookieCount = readFreeTrialCookie();
+    return Math.max(0, Math.min(FREE_TRIAL_LIMIT, Math.max(localCount, cookieCount)));
+  }
+
+  function saveFreeTrialUsed(nextCount) {
+    const clamped = Math.max(0, Math.min(FREE_TRIAL_LIMIT, Math.floor(Number(nextCount) || 0)));
+    state.freeTrialUsed = Math.max(state.freeTrialUsed || 0, clamped);
+    try {
+      localStorage.setItem(STORAGE_KEYS.FREE_TRIAL_USES, String(state.freeTrialUsed));
+    } catch {
+      // Ignore storage quota errors
+    }
+    try {
+      document.cookie = `${FREE_TRIAL_COOKIE_NAME}=${encodeURIComponent(String(state.freeTrialUsed))}; path=/; max-age=31536000; SameSite=Lax`;
+    } catch {
+      // Ignore cookie write errors
+    }
+    return state.freeTrialUsed;
+  }
+
   function getPromptAccessState() {
     if (typeof cloudSync === 'undefined' || !cloudSync.user) {
       return { allowed: false, status: 'signed_out', isAdmin: false, isExpired: false, accessExpiresAt: null };
@@ -917,13 +1011,76 @@ import { initPwaSupport } from './src/lib/pwa.js';
     };
   }
 
+  function getFreeTrialState() {
+    const access = getPromptAccessState();
+    const isPaid = Boolean(access.allowed);
+    const cloudUsed = (typeof cloudSync !== 'undefined' && cloudSync.user)
+      ? (Number(cloudSync.getActivePlanMeta().freeTrialUsed) || 0)
+      : 0;
+    const localUsed = Math.max(Number(state.freeTrialUsed) || 0, loadFreeTrialUsed());
+    const used = Math.max(0, Math.min(FREE_TRIAL_LIMIT, Math.max(localUsed, cloudUsed)));
+    if (used > state.freeTrialUsed) {
+      saveFreeTrialUsed(used);
+    }
+    const remaining = Math.max(0, FREE_TRIAL_LIMIT - used);
+    const blockedByAccountStatus = Boolean(!isPaid && (access.status === 'paused' || access.isExpired));
+    const canUseTrial = !isPaid && !blockedByAccountStatus && remaining > 0;
+    const exhausted = !isPaid && !blockedByAccountStatus && remaining <= 0;
+    return {
+      isPaid,
+      access,
+      used,
+      limit: FREE_TRIAL_LIMIT,
+      remaining,
+      canUseTrial,
+      exhausted,
+      blockedByAccountStatus
+    };
+  }
+
   function isPromptAccessAllowed() {
     return getPromptAccessState().allowed;
   }
 
+  function updateFreeTrialIndicators() {
+    const trial = getFreeTrialState();
+    if (dom.feedFreeTrialPill) {
+      if (trial.isPaid || trial.blockedByAccountStatus) {
+        dom.feedFreeTrialPill.style.display = 'none';
+      } else {
+        dom.feedFreeTrialPill.style.display = 'inline-flex';
+        dom.feedFreeTrialPill.classList.toggle('is-exhausted', trial.exhausted);
+        if (dom.lblFeedFreeTrialText) {
+          dom.lblFeedFreeTrialText.textContent = trial.exhausted
+            ? `Free Trial Used (${trial.limit}/${trial.limit}) · Upgrade for Unlimited`
+            : `Free Trial · ${trial.remaining} of ${trial.limit} prompts left (21s ad)`;
+        }
+      }
+    }
+    if (dom.modalFreeTrialBanner && dom.lblModalFreeTrialCount) {
+      if (trial.canUseTrial && !state.clientMode) {
+        dom.modalFreeTrialBanner.style.display = 'flex';
+        dom.lblModalFreeTrialCount.textContent = `Free Trial: ${trial.remaining} of ${trial.limit} prompts left`;
+      } else {
+        dom.modalFreeTrialBanner.style.display = 'none';
+      }
+    }
+  }
+
   function enforceLockedPromptAction(actionLabel = 'Prompt access') {
-    const access = getPromptAccessState();
-    if (access.allowed) return true;
+    const trial = getFreeTrialState();
+    const access = trial.access;
+    if (trial.isPaid || trial.canUseTrial) return true;
+    if (trial.exhausted) {
+      if (access.status === 'signed_out') {
+        showToast(`Free trial complete (${trial.limit}/${trial.limit} used)! Sign in & request Yashraj Pro approval for unlimited ad-free access.`);
+        openClerkAuthModal('signIn');
+      } else {
+        showToast(`Free trial complete (${trial.limit}/${trial.limit} used)! Request Yashraj Pro approval from Studio Admin for unlimited ad-free prompts.`);
+        openAccountPlanModal();
+      }
+      return false;
+    }
     if (access.status === 'signed_out') {
       showToast(`Sign in and get Studio Admin approval to unlock ${actionLabel}.`);
       openClerkAuthModal('signIn');
@@ -940,36 +1097,453 @@ import { initPwaSupport } from './src/lib/pwa.js';
   }
 
   // ==========================================================================
+  // 21-SECOND UNSKIPPABLE SHOP VIDEO AD GATE (FREE TRIAL USERS ONLY)
+  // ==========================================================================
+  function updateAdGateMuteUI() {
+    const muted = Boolean(state.adGate.muted);
+    if (dom.adGateVideo) {
+      dom.adGateVideo.muted = muted;
+    }
+    if (dom.btnAdGateMute) {
+      dom.btnAdGateMute.classList.toggle('is-unmuted', !muted);
+      const mutedIcon = dom.btnAdGateMute.querySelector('.ad-gate-icon-muted');
+      const soundIcon = dom.btnAdGateMute.querySelector('.ad-gate-icon-sound');
+      if (mutedIcon) mutedIcon.style.display = muted ? 'block' : 'none';
+      if (soundIcon) soundIcon.style.display = muted ? 'none' : 'block';
+    }
+    if (dom.lblAdGateMuteText) {
+      dom.lblAdGateMuteText.textContent = muted ? 'Sound Off' : 'Sound On';
+    }
+    if (dom.btnAdGateUnmutePrompt) {
+      dom.btnAdGateUnmutePrompt.style.display = (muted && !state.adGate.fallbackMode && !state.adGate.completed) ? 'inline-flex' : 'none';
+    }
+  }
+
+  function showAdGateFallbackStage(reasonText) {
+    state.adGate.fallbackMode = true;
+    if (dom.adGateVideo) {
+      try { dom.adGateVideo.pause(); } catch {}
+      dom.adGateVideo.style.display = 'none';
+    }
+    if (dom.btnAdGateUnmutePrompt) dom.btnAdGateUnmutePrompt.style.display = 'none';
+    if (dom.adGateFallbackStage) dom.adGateFallbackStage.style.display = 'flex';
+    if (dom.lblAdGateFallbackNote && reasonText) {
+      dom.lblAdGateFallbackNote.textContent = reasonText;
+    }
+  }
+
+  function closeAdGateModal(force = false) {
+    if (!force && state.adGate.active && !state.adGate.completed) return;
+    if (state.adGate.timerId) {
+      clearInterval(state.adGate.timerId);
+      state.adGate.timerId = null;
+    }
+    if (dom.adGateVideo) {
+      try {
+        dom.adGateVideo.pause();
+        dom.adGateVideo.currentTime = 0;
+      } catch {}
+    }
+    if (dom.studioAdGateModal) {
+      dom.studioAdGateModal.classList.remove('active');
+    }
+    const resolveFn = state.adGate.resolvePromise;
+    state.adGate.active = false;
+    state.adGate.completed = false;
+    state.adGate.pendingPayload = null;
+    state.adGate.resolvedPrompt = '';
+    state.adGate.resolvedUrl = '';
+    state.adGate.resolvePromise = null;
+
+    if (!state.activeModalPin && !(dom.aiAutoTakeModal && dom.aiAutoTakeModal.classList.contains('active'))) {
+      document.body.style.overflow = '';
+    }
+    if (typeof resolveFn === 'function') {
+      resolveFn(false);
+    }
+  }
+
+  async function writeTextToClipboardDirect(text) {
+    const val = String(text || '');
+    if (!val) return false;
+    try {
+      if (navigator.clipboard && window.isSecureContext && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(val);
+        return true;
+      }
+    } catch {
+      // Fallback to execCommand below
+    }
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = val;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '0';
+      textarea.style.left = '0';
+      textarea.style.width = '1px';
+      textarea.style.height = '1px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus({ preventScroll: true });
+      textarea.select();
+      textarea.setSelectionRange(0, val.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return Boolean(ok);
+    } catch {
+      return false;
+    }
+  }
+
+  function buildUnlockedPromptText(pin, rawPrompt, payload) {
+    const basePin = pin ? { ...pin, prompt: rawPrompt || pin.prompt || '' } : { prompt: rawPrompt || '' };
+    let text = payload?.customizerApplied ? getCustomizedPrompt(basePin) : String(basePin.prompt || '');
+    if (payload?.promptSuffix) {
+      text = `${text}${payload.promptSuffix}`;
+    }
+    return cleanPromptForAi(text);
+  }
+
+  async function finalizeAdGateCompletion() {
+    if (state.adGate.completed) return;
+    state.adGate.completed = true;
+    if (state.adGate.timerId) {
+      clearInterval(state.adGate.timerId);
+      state.adGate.timerId = null;
+    }
+    if (dom.adGateProgressFill) dom.adGateProgressFill.style.width = '100%';
+    if (dom.lblAdGateCountdown) {
+      dom.lblAdGateCountdown.textContent = 'Ad Complete ✓';
+      dom.lblAdGateCountdown.classList.add('is-done');
+    }
+    if (dom.btnAdGateUnmutePrompt) dom.btnAdGateUnmutePrompt.style.display = 'none';
+    if (dom.adGateVideo) {
+      try { dom.adGateVideo.pause(); } catch {}
+    }
+
+    const payload = state.adGate.pendingPayload || {};
+    const pin = payload.pin || null;
+    const actionType = payload.actionType || 'copy';
+    const targetKey = payload.targetKey || '';
+    const trialBefore = getFreeTrialState();
+
+    let rawPrompt = payload.rawPrompt || (pin ? pin.prompt : '') || '';
+    let serverCountApplied = false;
+
+    // Fetch server-locked cloud style prompt only AFTER 21s ad completes
+    if (pin && (pin.promptLocked || !rawPrompt) && typeof cloudSync !== 'undefined' && typeof cloudSync.unlockTrialPrompt === 'function') {
+      if (dom.lblAdGatePendingAction) dom.lblAdGatePendingAction.textContent = 'Unlocking studio prompt...';
+      const unlocked = await cloudSync.unlockTrialPrompt({
+        styleId: pin.id,
+        actionType,
+        aiTarget: targetKey
+      });
+      if (unlocked?.ok && unlocked.prompt) {
+        rawPrompt = unlocked.prompt;
+        pin.prompt = unlocked.prompt;
+        pin.promptLocked = false;
+        const cachedInCustom = state.customStyles.find(p => Number(p.id) === Number(pin.id));
+        if (cachedInCustom) {
+          cachedInCustom.prompt = unlocked.prompt;
+          cachedInCustom.promptLocked = false;
+        }
+        if (state.activeModalPin && Number(state.activeModalPin.id) === Number(pin.id)) {
+          state.activeModalPin.prompt = unlocked.prompt;
+          state.activeModalPin.promptLocked = false;
+        }
+        if (typeof unlocked.freeTrialUsed === 'number' && unlocked.freeTrialUsed > 0) {
+          saveFreeTrialUsed(Math.max(trialBefore.used + 1, unlocked.freeTrialUsed));
+          serverCountApplied = true;
+        }
+      } else if (unlocked?.code === 'TRIAL_EXHAUSTED') {
+        saveFreeTrialUsed(FREE_TRIAL_LIMIT);
+        updateAccountAndSubscriptionUI();
+        closeAdGateModal(true);
+        enforceLockedPromptAction(actionType === 'ai_redirect' ? 'AI Auto Take' : 'Prompt copy');
+        return;
+      } else if (!rawPrompt) {
+        showToast(unlocked?.reason || 'Could not unlock prompt right now. Please try again.');
+        closeAdGateModal(true);
+        return;
+      }
+    }
+
+    const finalPrompt = buildUnlockedPromptText(pin, rawPrompt, payload);
+    if (!finalPrompt) {
+      showToast('Prompt is unavailable for this style.');
+      closeAdGateModal(true);
+      return;
+    }
+
+    // Consume 1 Free Trial prompt credit now that the 21s ad has finished
+    if (!serverCountApplied) {
+      const nextUsed = saveFreeTrialUsed(trialBefore.used + 1);
+      if (pin?.id && typeof cloudSync !== 'undefined' && cloudSync.user) {
+        cloudSync.recordPromptUsage({
+          pinId: Number(pin.id),
+          pinTitle: pin.title || `Style #${pin.id}`,
+          category: pin.category || '',
+          actionType,
+          aiTarget: targetKey,
+          isTrial: true
+        });
+      }
+      void nextUsed;
+    }
+
+    if (pin?.id) {
+      state.trialUnlockedPinIds.add(Number(pin.id));
+      recordRecent(pin.id);
+    }
+
+    state.adGate.resolvedPrompt = finalPrompt;
+    updateAccountAndSubscriptionUI();
+
+    const trialAfter = getFreeTrialState();
+    const remainMsg = trialAfter.remaining > 0
+      ? `${trialAfter.remaining} of ${trialAfter.limit} free prompts left.`
+      : `Free trial complete (${trialAfter.limit}/${trialAfter.limit} used). Upgrade to Yashraj Pro for unlimited ad-free prompts.`;
+
+    const resolveFn = state.adGate.resolvePromise;
+
+    if (actionType === 'copy') {
+      const copied = await writeTextToClipboardDirect(finalPrompt);
+      if (copied) {
+        state.adGate.resolvePromise = null;
+        closeAdGateModal(true);
+        if (payload.notify !== false) {
+          showToast(`Prompt copied! ${remainMsg}`);
+        }
+        if (typeof resolveFn === 'function') resolveFn(true);
+        return;
+      }
+
+      // If browser blocked async clipboard after 21s, give an instant 1-tap copy button
+      if (dom.adGateRunningBar) dom.adGateRunningBar.style.display = 'none';
+      if (dom.adGateCompleteBar) dom.adGateCompleteBar.style.display = 'flex';
+      if (dom.lblAdGateCompleteTitle) dom.lblAdGateCompleteTitle.textContent = 'Ad complete — tap to copy your prompt!';
+      if (dom.lblAdGateCompleteSub) dom.lblAdGateCompleteSub.textContent = remainMsg;
+      if (dom.btnAdGateContinueAction) {
+        dom.btnAdGateContinueAction.textContent = 'Copy Prompt Now';
+        dom.btnAdGateContinueAction.style.display = 'inline-flex';
+      }
+      if (dom.linkAdGateOpenAi) dom.linkAdGateOpenAi.style.display = 'none';
+      return;
+    }
+
+    // AI Auto Take redirect continuation after 21s ad completes
+    const app = AI_APPS[targetKey] || AI_APPS.chatgpt;
+    await writeTextToClipboardDirect(finalPrompt);
+
+    if (targetKey === 'native_share' && isMobileDevice() && navigator.share) {
+      const fallbackUrl = AI_APPS.chatgpt.getUrl(finalPrompt);
+      state.adGate.resolvedUrl = fallbackUrl;
+      if (dom.adGateRunningBar) dom.adGateRunningBar.style.display = 'none';
+      if (dom.adGateCompleteBar) dom.adGateCompleteBar.style.display = 'flex';
+      if (dom.lblAdGateCompleteTitle) dom.lblAdGateCompleteTitle.textContent = 'Ad complete — ready to share!';
+      if (dom.lblAdGateCompleteSub) dom.lblAdGateCompleteSub.textContent = `Prompt copied! Tap Share to send to your device AI app. ${remainMsg}`;
+      if (dom.btnAdGateContinueAction) {
+        dom.btnAdGateContinueAction.textContent = 'Share to AI App';
+        dom.btnAdGateContinueAction.style.display = 'inline-flex';
+      }
+      if (dom.linkAdGateOpenAi) {
+        dom.linkAdGateOpenAi.href = fallbackUrl;
+        dom.linkAdGateOpenAi.textContent = 'Open ChatGPT Web →';
+        dom.linkAdGateOpenAi.style.display = 'inline-flex';
+      }
+      if (typeof resolveFn === 'function') {
+        state.adGate.resolvePromise = null;
+        resolveFn(true);
+      }
+      return;
+    }
+
+    const targetUrl = (app && app.action === 'url') ? app.getUrl(finalPrompt) : AI_APPS.chatgpt.getUrl(finalPrompt);
+    const appDisplayName = (app && app.action === 'url') ? app.name : AI_APPS.chatgpt.name;
+    state.adGate.resolvedUrl = targetUrl;
+
+    // Attempt automatic launch right as the 21s ad finishes
+    openExternalUrl(targetUrl);
+    showToast(
+      app?.clipboardOnlyNote
+        ? `Prompt copied! Opening ${appDisplayName} — press Ctrl+V (⌘V) to paste. ${remainMsg}`
+        : `Launching ${appDisplayName}! ${remainMsg}`
+    );
+
+    // Also show a 1-tap instant launch button in case the browser popup blocker paused async tab opening
+    if (dom.adGateRunningBar) dom.adGateRunningBar.style.display = 'none';
+    if (dom.adGateCompleteBar) dom.adGateCompleteBar.style.display = 'flex';
+    if (dom.lblAdGateCompleteTitle) dom.lblAdGateCompleteTitle.textContent = `Ad complete — ${appDisplayName} ready!`;
+    if (dom.lblAdGateCompleteSub) dom.lblAdGateCompleteSub.textContent = `Prompt copied! If ${appDisplayName} didn't open automatically, tap below. ${remainMsg}`;
+    if (dom.btnAdGateContinueAction) dom.btnAdGateContinueAction.style.display = 'none';
+    if (dom.linkAdGateOpenAi) {
+      dom.linkAdGateOpenAi.href = targetUrl;
+      dom.linkAdGateOpenAi.textContent = `Open ${appDisplayName} →`;
+      dom.linkAdGateOpenAi.style.display = 'inline-flex';
+    }
+    if (typeof resolveFn === 'function') {
+      state.adGate.resolvePromise = null;
+      resolveFn(true);
+    }
+  }
+
+  function runWithFreeTrialAdGate(payload) {
+    return new Promise((resolve) => {
+      if (!dom.studioAdGateModal) {
+        resolve(false);
+        return;
+      }
+      if (state.adGate.active) {
+        showToast('Please wait for the 21-second Yashraj Frames ad to finish.');
+        resolve(false);
+        return;
+      }
+
+      const trial = getFreeTrialState();
+      if (!trial.canUseTrial) {
+        enforceLockedPromptAction(payload?.actionType === 'ai_redirect' ? 'AI Auto Take' : 'Prompt copy');
+        resolve(false);
+        return;
+      }
+
+      state.adGate.active = true;
+      state.adGate.completed = false;
+      state.adGate.elapsedMs = 0;
+      state.adGate.lastTickAt = performance.now();
+      state.adGate.fallbackMode = false;
+      state.adGate.muted = true;
+      state.adGate.pendingPayload = payload;
+      state.adGate.resolvedPrompt = '';
+      state.adGate.resolvedUrl = '';
+      state.adGate.resolvePromise = resolve;
+
+      const pinTitle = payload?.pin?.title || 'Studio Prompt';
+      const targetApp = payload?.targetKey ? (AI_APPS[payload.targetKey] || AI_APPS.chatgpt) : null;
+      if (dom.lblAdGatePendingAction) {
+        dom.lblAdGatePendingAction.textContent = payload?.actionType === 'ai_redirect'
+          ? `Next: Launching ${targetApp?.name || 'AI App'} with "${pinTitle}"`
+          : `Next: Copying "${pinTitle}" to clipboard`;
+      }
+      if (dom.lblAdGateTrialHint) {
+        const nextUseNumber = Math.min(trial.limit, trial.used + 1);
+        dom.lblAdGateTrialHint.textContent = `Free Trial (${nextUseNumber} of ${trial.limit}) · Unlocks automatically after 21s (unskippable)`;
+      }
+      if (dom.lblAdGateCountdown) {
+        dom.lblAdGateCountdown.textContent = `Ad · ${AD_GATE_DURATION_SEC}s left`;
+        dom.lblAdGateCountdown.classList.remove('is-done');
+      }
+      if (dom.adGateProgressFill) dom.adGateProgressFill.style.width = '0%';
+      if (dom.adGateRunningBar) dom.adGateRunningBar.style.display = 'flex';
+      if (dom.adGateCompleteBar) dom.adGateCompleteBar.style.display = 'none';
+      if (dom.adGateFallbackStage) dom.adGateFallbackStage.style.display = 'none';
+      if (dom.adGateVideo) {
+        dom.adGateVideo.style.display = 'block';
+        dom.adGateVideo.muted = true;
+        try {
+          dom.adGateVideo.currentTime = 0;
+          if (dom.adGateVideo.networkState === 3 || dom.adGateVideo.error) {
+            dom.adGateVideo.load();
+          }
+          const playPromise = dom.adGateVideo.play();
+          if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(() => {
+              showAdGateFallbackStage('Yashraj Frames Showcase · Auto-playing preview');
+            });
+          }
+        } catch {
+          showAdGateFallbackStage('Yashraj Frames Showcase · Auto-playing preview');
+        }
+      } else {
+        showAdGateFallbackStage('Yashraj Frames Showcase');
+      }
+
+      updateAdGateMuteUI();
+      dom.studioAdGateModal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+
+      const totalMs = AD_GATE_DURATION_SEC * 1000;
+      let videoStallCheckMs = 0;
+
+      state.adGate.timerId = setInterval(() => {
+        if (!state.adGate.active || state.adGate.completed) return;
+        const now = performance.now();
+        if (document.hidden) {
+          state.adGate.lastTickAt = now;
+          return;
+        }
+        const delta = Math.min(500, Math.max(0, now - state.adGate.lastTickAt));
+        state.adGate.lastTickAt = now;
+        state.adGate.elapsedMs += delta;
+
+        // If yashrajframead.mp4 failed to buffer/load after 1.6s, switch smoothly to the branded showcase card
+        if (!state.adGate.fallbackMode && dom.adGateVideo) {
+          videoStallCheckMs += delta;
+          if (videoStallCheckMs >= 1600 && (dom.adGateVideo.readyState < 2 || dom.adGateVideo.error)) {
+            showAdGateFallbackStage('Yashraj Frames Studio Preview');
+          }
+        }
+
+        const pct = Math.min(100, (state.adGate.elapsedMs / totalMs) * 100);
+        const secondsLeft = Math.max(0, Math.ceil((totalMs - state.adGate.elapsedMs) / 1000));
+        if (dom.adGateProgressFill) dom.adGateProgressFill.style.width = `${pct.toFixed(1)}%`;
+        if (dom.lblAdGateCountdown) {
+          dom.lblAdGateCountdown.textContent = secondsLeft > 0 ? `Ad · ${secondsLeft}s left` : 'Unlocking...';
+        }
+
+        if (state.adGate.elapsedMs >= totalMs) {
+          void finalizeAdGateCompletion();
+        }
+      }, 150);
+    });
+  }
+
+  // ==========================================================================
   // CLIPBOARD COPY
   // ==========================================================================
-  async function copyPromptToClipboard(promptText, pinId, notify = true) {
-    if (!promptText) return false;
-    if (pinId && !enforceLockedPromptAction('Prompt copy')) return false;
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(promptText);
-      } else {
-        const textarea = document.createElement('textarea');
-        textarea.value = promptText;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
+  async function copyPromptToClipboard(promptText, pinId, notify = true, options = {}) {
+    // Non-prompt clipboard copies (e.g. Framing Shop Job Slip) bypass ad & trial limits
+    if (!pinId) {
+      if (!promptText) return false;
+      const ok = await writeTextToClipboardDirect(promptText);
+      if (notify) showToast(ok ? 'Copied to clipboard!' : 'Unable to copy to clipboard');
+      return ok;
+    }
+
+    const trial = getFreeTrialState();
+    const pin = options.pin || getAllPrompts().find(p => Number(p.id) === Number(pinId)) || null;
+
+    if (!trial.isPaid) {
+      if (!trial.canUseTrial) {
+        enforceLockedPromptAction('Prompt copy');
+        return false;
       }
-      if (pinId) {
-        recordRecent(pinId);
-        const pin = getAllPrompts().find(p => Number(p.id) === Number(pinId));
-        if (typeof cloudSync !== 'undefined' && cloudSync.user) {
-          cloudSync.recordPromptUsage({
-            pinId: Number(pinId),
-            pinTitle: pin?.title || `Style #${pinId}`,
-            category: pin?.category || '',
-            actionType: 'copy'
-          });
-        }
+      // Strictly gate behind the 21s unskippable ad — prompt is NOT copied until ad finishes
+      return runWithFreeTrialAdGate({
+        actionType: 'copy',
+        pin,
+        rawPrompt: promptText || (pin ? pin.prompt : ''),
+        customizerApplied: Boolean(options.customizerApplied),
+        promptSuffix: options.promptSuffix || '',
+        notify
+      });
+    }
+
+    if (!promptText) return false;
+    try {
+      const ok = await writeTextToClipboardDirect(promptText);
+      if (!ok) {
+        if (notify) showToast('Unable to copy to clipboard');
+        return false;
+      }
+      recordRecent(pinId);
+      if (typeof cloudSync !== 'undefined' && cloudSync.user) {
+        cloudSync.recordPromptUsage({
+          pinId: Number(pinId),
+          pinTitle: pin?.title || `Style #${pinId}`,
+          category: pin?.category || '',
+          actionType: 'copy'
+        });
       }
       if (notify) showToast('Prompt copied to clipboard!');
       return true;
@@ -1264,8 +1838,14 @@ import { initPwaSupport } from './src/lib/pwa.js';
     if (!pin) return;
     state.activeTargetPin = pin;
     if (dom.aiLauncherPromptPreview) {
-      const cleanPrompt = cleanPromptForAi(pin.prompt).replace(/\s+/g, ' ');
-      dom.aiLauncherPromptPreview.textContent = `"${cleanPrompt.slice(0, 160)}${cleanPrompt.length > 160 ? '...' : ''}"`;
+      const trial = getFreeTrialState();
+      const isPinUnlocked = trial.isPaid || state.trialUnlockedPinIds.has(Number(pin.id));
+      if (!isPinUnlocked) {
+        dom.aiLauncherPromptPreview.textContent = `Free Trial (${trial.remaining} of ${trial.limit} left): Pick an AI app below — your prompt unlocks & launches right after the 21s Yashraj Frames preview ad.`;
+      } else {
+        const cleanPrompt = cleanPromptForAi(pin.prompt).replace(/\s+/g, ' ');
+        dom.aiLauncherPromptPreview.textContent = `"${cleanPrompt.slice(0, 160)}${cleanPrompt.length > 160 ? '...' : ''}"`;
+      }
     }
     if (dom.btnTargetNativeShare) {
       dom.btnTargetNativeShare.style.display = isMobileDevice() ? 'flex' : 'none';
@@ -1283,7 +1863,25 @@ import { initPwaSupport } from './src/lib/pwa.js';
   }
 
   function executeAiAutoTake(pin, targetKey) {
-    if (!enforceLockedPromptAction('AI Auto Take redirect')) return;
+    const trial = getFreeTrialState();
+    if (!trial.isPaid) {
+      if (!trial.canUseTrial) {
+        enforceLockedPromptAction('AI Auto Take redirect');
+        return;
+      }
+      if (!pin) return;
+      // Strictly gate behind the 21s unskippable ad — NO copy & NO redirect until ad finishes
+      void runWithFreeTrialAdGate({
+        actionType: 'ai_redirect',
+        pin,
+        rawPrompt: pin.prompt || '',
+        targetKey,
+        customizerApplied: Boolean(pin._customizerApplied),
+        promptSuffix: pin._promptSuffix || ''
+      });
+      return;
+    }
+
     if (!pin || !pin.prompt) return;
     const cleanPrompt = cleanPromptForAi(pin.prompt);
 
@@ -1538,7 +2136,8 @@ import { initPwaSupport } from './src/lib/pwa.js';
     
     const tailoredPin = {
       ...pin,
-      prompt: `${pin.prompt}\n\n${printSpecAddition}`
+      prompt: pin.prompt ? `${pin.prompt}\n\n${printSpecAddition}` : '',
+      _promptSuffix: `\n\n${printSpecAddition}`
     };
 
     handleAiAutoTake(tailoredPin);
@@ -1867,12 +2466,14 @@ import { initPwaSupport } from './src/lib/pwa.js';
     const user = cloudSync.user;
     const plan = cloudSync.getActivePlanMeta();
     const adminAllowed = isAdminUser();
-    const access = getPromptAccessState();
-    const isLocked = !access.allowed;
+    const trial = getFreeTrialState();
+    const isLocked = !trial.isPaid && !trial.canUseTrial;
 
     // Toggle document-wide access lock and admin-only styling classes
     document.body.classList.toggle('subscription-locked', isLocked);
     document.body.classList.toggle('is-admin-user', adminAllowed);
+    document.body.classList.toggle('free-trial-active', trial.canUseTrial);
+    updateFreeTrialIndicators();
 
     // Admin entrypoints — STRICTLY shown only when logged in as yashrajart1999@gmail.com
     if (dom.btnHeaderAdmin) {
@@ -3726,6 +4327,15 @@ Looking forward to welcoming you! Thank you.`);
 
   function updateCustomizedPromptDisplay() {
     if (!state.activeModalPin) return;
+    const trial = getFreeTrialState();
+    const isTrialProtected = !trial.isPaid && !state.trialUnlockedPinIds.has(Number(state.activeModalPin.id));
+    if (isTrialProtected) {
+      if (dom.modalPromptCounts) {
+        dom.modalPromptCounts.textContent = `Free Trial · ${trial.remaining}/${trial.limit} left`;
+      }
+      syncPromptVarsCardUI(detectPromptPlaceholders(state.activeModalPin.prompt));
+      return;
+    }
     const { text: customized, activeReplacements } = getCustomizedPromptResult(state.activeModalPin);
     if (dom.modalPromptText) {
       renderHighlightedPromptPreview(dom.modalPromptText, customized, activeReplacements);
@@ -5295,12 +5905,19 @@ Looking forward to welcoming you! Thank you.`);
 
   function applyModalPromptAccessUI(pin) {
     if (!pin) return;
-    const access = getPromptAccessState();
+    const trial = getFreeTrialState();
+    const access = trial.access;
+    const canInteract = trial.isPaid || trial.canUseTrial;
 
-    if (!access.allowed) {
+    if (!canInteract) {
       if (dom.modalPromptText) dom.modalPromptText.textContent = '';
       if (dom.modalPromptCounts) dom.modalPromptCounts.textContent = 'Locked';
-      if (dom.modalPromptCard) dom.modalPromptCard.style.display = 'none';
+      if (dom.modalPromptCard) {
+        dom.modalPromptCard.style.display = 'none';
+        dom.modalPromptCard.classList.remove('is-trial-protected');
+      }
+      if (dom.modalPromptTrialOverlay) dom.modalPromptTrialOverlay.style.display = 'none';
+      if (dom.modalFreeTrialBanner) dom.modalFreeTrialBanner.style.display = 'none';
       if (dom.modalVarsCard) dom.modalVarsCard.style.display = 'none';
       if (dom.pinPromptCustomizer) dom.pinPromptCustomizer.style.display = 'none';
       if (dom.modalClientShowroomCard) dom.modalClientShowroomCard.style.display = 'none';
@@ -5311,7 +5928,9 @@ Looking forward to welcoming you! Thank you.`);
       if (dom.modalSubscriptionLockedCard) {
         dom.modalSubscriptionLockedCard.style.display = 'flex';
         if (dom.lblModalLockTitle) {
-          if (access.status === 'signed_out') {
+          if (trial.exhausted) {
+            dom.lblModalLockTitle.textContent = `Free Trial Complete (${trial.limit}/${trial.limit} Prompts Used)`;
+          } else if (access.status === 'signed_out') {
             dom.lblModalLockTitle.textContent = 'Sign In & Admin Approval Required';
           } else if (access.isExpired) {
             dom.lblModalLockTitle.textContent = 'Access Validity Expired';
@@ -5322,7 +5941,9 @@ Looking forward to welcoming you! Thank you.`);
           }
         }
         if (dom.lblModalLockDesc) {
-          if (access.status === 'signed_out') {
+          if (trial.exhausted) {
+            dom.lblModalLockDesc.textContent = `You have used all ${trial.limit} free trial prompts. Sign in and request Yashraj Pro approval from Studio Admin (${PUBLIC_CONTACT_EMAIL}) for unlimited ad-free prompt copying and instant AI Auto Take.`;
+          } else if (access.status === 'signed_out') {
             dom.lblModalLockDesc.textContent = `You must sign in and be manually approved by Studio Admin (${PUBLIC_CONTACT_EMAIL}) before viewing prompts, copying, or using AI Auto Take.`;
           } else if (access.isExpired) {
             const valSummary = formatValiditySummary({
@@ -5339,7 +5960,11 @@ Looking forward to welcoming you! Thank you.`);
           }
         }
         if (dom.lblModalLockAccountBtn) {
-          if (access.status === 'signed_out') {
+          if (trial.exhausted) {
+            dom.lblModalLockAccountBtn.textContent = access.status === 'signed_out'
+              ? 'Sign In & Unlock Unlimited Pro'
+              : 'Request Unlimited Ad-Free Pro';
+          } else if (access.status === 'signed_out') {
             dom.lblModalLockAccountBtn.textContent = 'Sign In to Request Access';
           } else if (access.isExpired) {
             dom.lblModalLockAccountBtn.textContent = 'View Renewal Details';
@@ -5363,8 +5988,28 @@ Looking forward to welcoming you! Thank you.`);
     if (dom.modalPromptCard) dom.modalPromptCard.style.display = state.clientMode ? 'none' : 'block';
     if (dom.modalClientShowroomCard) dom.modalClientShowroomCard.style.display = state.clientMode ? 'block' : 'none';
 
+    updateFreeTrialIndicators();
+
+    const isTrialProtected = !trial.isPaid && !state.trialUnlockedPinIds.has(Number(pin.id));
+    if (dom.modalPromptCard) {
+      dom.modalPromptCard.classList.toggle('is-trial-protected', isTrialProtected);
+    }
+    if (dom.modalPromptTrialOverlay) {
+      dom.modalPromptTrialOverlay.style.display = (isTrialProtected && !state.clientMode) ? 'flex' : 'none';
+    }
+
     if (!state.clientMode) {
       renderPromptVarsPanel(pin);
+    }
+
+    if (isTrialProtected) {
+      if (dom.modalPromptText) {
+        dom.modalPromptText.textContent = 'Ultra-detailed royal studio portrait prompt protected during Free Trial. Press Copy Prompt or AI Auto Take to watch the 21s Yashraj Frames showcase and unlock.';
+      }
+      if (dom.modalPromptCounts) {
+        dom.modalPromptCounts.textContent = `Free Trial · ${trial.remaining}/${trial.limit} left`;
+      }
+      return;
     }
 
     const { text: displayPrompt, activeReplacements } = getCustomizedPromptResult(pin);
@@ -5744,7 +6389,7 @@ Looking forward to welcoming you! Thank you.`);
         const id = Number(copyBtn.getAttribute('data-id'));
         const pin = getAllPrompts().find(p => p.id === id);
         if (pin) {
-          const ok = await copyPromptToClipboard(pin.prompt, pin.id);
+          const ok = await copyPromptToClipboard(pin.prompt, pin.id, true, { pin });
           if (ok) {
             const lbl = copyBtn.querySelector('.save-label');
             const useEl = copyBtn.querySelector('svg use');
@@ -6580,7 +7225,8 @@ Looking forward to welcoming you! Thank you.`);
         if (state.activeModalPin) {
           const tailored = {
             ...state.activeModalPin,
-            prompt: getCustomizedPrompt(state.activeModalPin)
+            prompt: getCustomizedPrompt(state.activeModalPin),
+            _customizerApplied: true
           };
           handleAiAutoTake(tailored);
         }
@@ -6615,7 +7261,10 @@ Looking forward to welcoming you! Thank you.`);
     dom.btnModalCopyPrompt.addEventListener('click', async () => {
       if (!state.activeModalPin) return;
       const promptToCopy = getCustomizedPrompt(state.activeModalPin);
-      const ok = await copyPromptToClipboard(promptToCopy, state.activeModalPin.id);
+      const ok = await copyPromptToClipboard(promptToCopy, state.activeModalPin.id, true, {
+        pin: state.activeModalPin,
+        customizerApplied: true
+      });
       if (ok) {
         dom.btnModalCopyLabel.textContent = 'Copied!';
         dom.btnModalCopyPrompt.classList.add('copied');
@@ -6629,6 +7278,123 @@ Looking forward to welcoming you! Thank you.`);
         }, 2000);
       }
     });
+
+    // Free Trial Pill & Upgrade CTA Handlers
+    if (dom.feedFreeTrialPill) {
+      dom.feedFreeTrialPill.addEventListener('click', () => {
+        if (typeof cloudSync !== 'undefined' && cloudSync.user) openAccountPlanModal();
+        else openClerkAuthModal('signIn');
+      });
+    }
+    if (dom.btnModalTrialUpgrade) {
+      dom.btnModalTrialUpgrade.addEventListener('click', () => {
+        if (typeof cloudSync !== 'undefined' && cloudSync.user) openAccountPlanModal();
+        else openClerkAuthModal('signIn');
+      });
+    }
+
+    // 21-Second Unskippable Ad Gate Handlers & Anti-Bypass Guards
+    if (dom.btnAdGateMute) {
+      dom.btnAdGateMute.addEventListener('click', () => {
+        state.adGate.muted = !state.adGate.muted;
+        updateAdGateMuteUI();
+        if (dom.adGateVideo && !state.adGate.fallbackMode && dom.adGateVideo.paused && !state.adGate.completed) {
+          dom.adGateVideo.play().catch(() => {});
+        }
+      });
+    }
+    if (dom.btnAdGateUnmutePrompt) {
+      dom.btnAdGateUnmutePrompt.addEventListener('click', () => {
+        state.adGate.muted = false;
+        updateAdGateMuteUI();
+        if (dom.adGateVideo && !state.adGate.fallbackMode && dom.adGateVideo.paused && !state.adGate.completed) {
+          dom.adGateVideo.play().catch(() => {});
+        }
+      });
+    }
+    if (dom.adGateVideo) {
+      dom.adGateVideo.addEventListener('contextmenu', (e) => e.preventDefault());
+      dom.adGateVideo.addEventListener('error', () => {
+        if (state.adGate.active && !state.adGate.completed) {
+          showAdGateFallbackStage('Yashraj Frames Studio Preview');
+        }
+      });
+      // Prevent seeking ahead to skip the 21s ad
+      const guardVideoSeek = () => {
+        if (!state.adGate.active || state.adGate.completed || state.adGate.fallbackMode) return;
+        const maxAllowedSec = (state.adGate.elapsedMs / 1000) + 1.25;
+        if (dom.adGateVideo.currentTime > maxAllowedSec) {
+          dom.adGateVideo.currentTime = Math.max(0, state.adGate.elapsedMs / 1000);
+        }
+      };
+      dom.adGateVideo.addEventListener('seeking', guardVideoSeek);
+      dom.adGateVideo.addEventListener('timeupdate', guardVideoSeek);
+      // If the video file is shorter than 21s, seamlessly loop it until the full 21s finishes
+      dom.adGateVideo.addEventListener('ended', () => {
+        if (state.adGate.active && !state.adGate.completed && !state.adGate.fallbackMode) {
+          dom.adGateVideo.currentTime = 0;
+          dom.adGateVideo.play().catch(() => {});
+        }
+      });
+    }
+    if (dom.adGateVideoStage) {
+      dom.adGateVideoStage.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (!state.adGate.active || state.adGate.completed) return;
+      if (document.hidden) {
+        if (dom.adGateVideo && !state.adGate.fallbackMode) {
+          try { dom.adGateVideo.pause(); } catch {}
+        }
+      } else {
+        state.adGate.lastTickAt = performance.now();
+        if (dom.adGateVideo && !state.adGate.fallbackMode) {
+          dom.adGateVideo.play().catch(() => {});
+        }
+      }
+    });
+    if (dom.btnAdGateContinueAction) {
+      dom.btnAdGateContinueAction.addEventListener('click', async () => {
+        if (!state.adGate.completed) return;
+        const payload = state.adGate.pendingPayload || {};
+        const promptText = state.adGate.resolvedPrompt || '';
+        const resolveFn = state.adGate.resolvePromise;
+        if (payload.actionType === 'ai_redirect' && payload.targetKey === 'native_share' && navigator.share) {
+          try {
+            await navigator.share({
+              title: `${payload.pin?.title || 'Studio Prompt'} - Yashraj Frames`,
+              text: promptText
+            });
+            showToast('Sent prompt to your device apps!');
+          } catch {
+            if (state.adGate.resolvedUrl) openExternalUrl(state.adGate.resolvedUrl);
+          }
+          state.adGate.resolvePromise = null;
+          closeAdGateModal(true);
+          if (typeof resolveFn === 'function') resolveFn(true);
+          return;
+        }
+        const ok = await writeTextToClipboardDirect(promptText);
+        showToast(ok ? 'Prompt copied to clipboard!' : 'Could not copy prompt.');
+        state.adGate.resolvePromise = null;
+        closeAdGateModal(true);
+        if (typeof resolveFn === 'function') resolveFn(Boolean(ok));
+      });
+    }
+    if (dom.linkAdGateOpenAi) {
+      dom.linkAdGateOpenAi.addEventListener('click', () => {
+        if (!state.adGate.completed) return;
+        if (state.adGate.resolvedPrompt) {
+          void writeTextToClipboardDirect(state.adGate.resolvedPrompt);
+        }
+        setTimeout(() => closeAdGateModal(true), 250);
+      });
+    }
+    if (dom.btnAdGateDone) {
+      dom.btnAdGateDone.addEventListener('click', () => {
+        if (state.adGate.completed) closeAdGateModal(true);
+      });
+    }
 
     // Mobile Modal Sticky Dock Handlers
     if (dom.btnMobModalFrame && dom.btnModalViewInFrame) {
@@ -6847,6 +7613,10 @@ Looking forward to welcoming you! Thank you.`);
     // 9. Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
+        if (state.adGate.active) {
+          if (state.adGate.completed) closeAdGateModal(true);
+          return;
+        }
         if (dom.studioLegalModal && dom.studioLegalModal.classList.contains('active')) closeStudioLegalModal();
         else if (dom.iosInstallGuideModal && dom.iosInstallGuideModal.classList.contains('active')) dom.iosInstallGuideModal.classList.remove('active');
         else if (dom.mobileToolsSheet && dom.mobileToolsSheet.classList.contains('active')) closeMobileToolsSheet();
