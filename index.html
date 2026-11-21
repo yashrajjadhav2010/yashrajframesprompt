@@ -867,6 +867,21 @@
                       <button type="button" class="admin-btn-secondary" id="btnAdminApplyValidity">Set Validity</button>
                     </div>
                   </div>
+                  <div class="admin-proof-box" id="adminInspPaymentProofBox" style="display: none;">
+                    <div class="admin-proof-head">
+                      <span class="admin-proof-title">Payment Receipt Proof</span>
+                      <span class="admin-proof-reqid" id="lblAdminInspProofReqId">YFPRO-</span>
+                    </div>
+                    <div class="admin-proof-meta" id="lblAdminInspProofMeta">Submitted via WhatsApp · 7588598293</div>
+                    <div class="admin-proof-utr" id="lblAdminInspProofUtr" style="display: none;"></div>
+                    <div class="admin-proof-thumb-wrap">
+                      <img id="imgAdminInspReceipt" class="admin-proof-thumb" alt="Customer payment receipt screenshot" style="display: none;" />
+                      <div class="admin-proof-status" id="lblAdminInspReceiptStatus">Loading receipt image...</div>
+                    </div>
+                    <div class="admin-proof-actions">
+                      <button type="button" class="admin-btn-secondary" id="btnAdminInspViewReceipt" disabled>View Full Receipt</button>
+                    </div>
+                  </div>
                   <div class="admin-note-editor">
                     <label for="adminInspNoteInput">Admin Payment / Approval Note</label>
                     <textarea id="adminInspNoteInput" rows="2" placeholder="e.g. Paid ₹499 via UPI on 15 Nov, approved till Dec"></textarea>
@@ -1848,6 +1863,13 @@
             <source src="assets/yashrajframead.mp4" type="video/mp4" />
           </video>
 
+          <!-- Low-Network Buffering / Loading Overlay (Timer stays paused while loading) -->
+          <div class="ad-gate-buffering-overlay" id="adGateBufferingOverlay" style="display: none;">
+            <div class="ad-gate-spinner" aria-hidden="true"></div>
+            <span class="ad-gate-buffering-text" id="lblAdGateBufferingText">Loading Yashraj Frames ad...</span>
+            <button type="button" class="ad-gate-resume-btn" id="btnAdGateResumePlay" style="display: none;">Tap to Resume Ad</button>
+          </div>
+
           <button type="button" class="ad-gate-unmute-float" id="btnAdGateUnmutePrompt" style="display: none;">
             Tap for Sound
           </button>
@@ -2200,6 +2222,115 @@
             <button type="button" class="studio-footer-link-btn" data-legal-open="contact">Contact Support</button>
             <span class="studio-footer-sep" aria-hidden="true">&middot;</span>
             <a class="studio-footer-email" href="mailto:tech.yashrajframes@gmail.com">tech.yashrajframes@gmail.com</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRO UPGRADE PAYMENT RECEIPT & WHATSAPP APPROVAL MODAL -->
+    <div class="pinterest-modal-backdrop pro-proof-backdrop" id="proPaymentProofModal">
+      <div class="pro-proof-card" role="dialog" aria-modal="true" aria-labelledby="lblProProofPlanTitle">
+        <button type="button" class="modal-floating-close-btn modal-card-corner-close" id="proProofCloseBtn" aria-label="Close Payment Proof Modal">
+          <svg style="width: 20px; height: 20px;"><use href="#icon-close"></use></svg>
+        </button>
+
+        <div class="pro-proof-header">
+          <div class="pro-proof-header-top">
+            <span class="pro-proof-badge" id="lblProProofPlanBadge">Yashraj Pro · ₹499/mo</span>
+            <span class="pro-proof-wa-pill">WhatsApp: 7588598293</span>
+          </div>
+          <h2 id="lblProProofPlanTitle">Submit Payment Receipt for Pro Approval</h2>
+          <p class="pro-proof-sub">
+            Attach your UPI / Bank payment screenshot. Your request will be logged for Studio Admin review and opened directly on WhatsApp (<strong>7588598293</strong>).
+          </p>
+          <div class="pro-proof-account-strip">
+            <span class="pro-proof-account-name" id="lblProProofUserName">Studio Account</span>
+            <span class="pro-proof-account-dot" aria-hidden="true">&middot;</span>
+            <span class="pro-proof-account-email" id="lblProProofUserEmail">account@studio.com</span>
+          </div>
+        </div>
+
+        <div class="pro-proof-body" id="proProofFormSection">
+          <div class="pro-proof-field">
+            <label class="pro-proof-label" for="inputProReceiptFile">
+              Payment Receipt / Screenshot <span class="pro-proof-required">Required *</span>
+            </label>
+            <input type="file" id="inputProReceiptFile" accept="image/*" hidden />
+            <div class="pro-receipt-dropzone" id="proReceiptDropzone" role="button" tabindex="0" aria-label="Upload payment receipt or screenshot">
+              <div class="pro-receipt-drop-prompt" id="proReceiptDropPrompt">
+                <div class="pro-receipt-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width: 26px; height: 26px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                </div>
+                <div class="pro-receipt-prompt-title">Tap to upload payment screenshot or receipt</div>
+                <div class="pro-receipt-prompt-sub">JPG, PNG, or WebP screenshot from GPay, PhonePe, Paytm, or Bank UPI</div>
+              </div>
+              <div class="pro-receipt-preview-wrap" id="proReceiptPreviewWrap" style="display: none;">
+                <img id="imgProReceiptPreview" class="pro-receipt-preview-img" alt="Selected payment receipt preview" />
+                <div class="pro-receipt-preview-footer">
+                  <span class="pro-receipt-file-meta" id="lblProReceiptFileMeta">receipt.jpg</span>
+                  <button type="button" class="pro-receipt-remove-btn" id="btnProReceiptRemove">Change Image</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pro-proof-row-two">
+            <div class="pro-proof-field">
+              <label class="pro-proof-label" for="inputProUtrRef">UTR / Transaction ID <span class="pro-proof-optional">(Optional)</span></label>
+              <input type="text" id="inputProUtrRef" class="pro-proof-input" maxlength="64" placeholder="e.g. 432198765432" autocomplete="off" />
+            </div>
+            <div class="pro-proof-field">
+              <label class="pro-proof-label" for="inputProPayerNote">Studio / Phone Note <span class="pro-proof-optional">(Optional)</span></label>
+              <input type="text" id="inputProPayerNote" class="pro-proof-input" maxlength="160" placeholder="e.g. Paid via PhonePe, Shop name" autocomplete="off" />
+            </div>
+          </div>
+
+          <div class="pro-proof-error" id="proProofErrorBox" role="alert" style="display: none;"></div>
+
+          <div class="pro-proof-tip">
+            When WhatsApp opens to <strong>+91 7588598293</strong>, please attach the same payment screenshot in the chat so we can approve your Pro access faster.
+          </div>
+
+          <div class="pro-proof-actions">
+            <button type="button" class="pro-proof-cancel-btn" id="btnCancelProProof">Cancel</button>
+            <button type="button" class="pro-proof-submit-btn" id="btnSubmitProProof">
+              Submit &amp; Send on WhatsApp (7588598293)
+            </button>
+          </div>
+        </div>
+
+        <div class="pro-proof-success" id="proProofSuccessSection" style="display: none;">
+          <div class="pro-proof-success-badge">
+            <svg style="width: 18px; height: 18px;"><use href="#icon-check"></use></svg>
+            <span>Receipt Uploaded &amp; Ready for WhatsApp (7588598293)</span>
+          </div>
+          <div class="pro-proof-success-preview">
+            <img id="imgProSuccessThumb" class="pro-proof-success-thumb" alt="Uploaded payment receipt" />
+            <div class="pro-proof-success-meta">
+              <div>Request ID: <strong id="lblProSuccessReqId">YFPRO-</strong></div>
+              <div>Plan: <strong id="lblProSuccessPlan">Yashraj Pro Studio</strong></div>
+              <a id="linkProReceiptView" class="pro-proof-receipt-link" href="#" target="_blank" rel="noopener noreferrer">View Uploaded Receipt Link &rarr;</a>
+            </div>
+          </div>
+          <div class="pro-proof-clipboard-note" id="lblProClipboardStatus">
+            Your receipt link is included directly inside the WhatsApp message. You can also paste (Ctrl+V) or share the image photo directly in WhatsApp chat.
+          </div>
+          <div class="pro-proof-success-actions">
+            <a id="linkProSuccessWhatsApp" class="pro-proof-wa-link" href="#" target="_blank" rel="noopener noreferrer">
+              Open WhatsApp (7588598293) with Receipt Link
+            </a>
+            <button type="button" class="pro-proof-share-file-btn" id="btnProShareReceiptFile" style="display: none;">
+              Share Actual Receipt Photo to WhatsApp (Mobile)
+            </button>
+            <div class="pro-proof-secondary-row pro-proof-secondary-three">
+              <button type="button" class="pro-proof-copy-btn" id="btnProCopyReceiptImg">Copy Receipt Image</button>
+              <button type="button" class="pro-proof-copy-btn" id="btnProCopyWaMsg">Copy Message</button>
+              <button type="button" class="pro-proof-done-btn" id="btnProProofDone">Done</button>
+            </div>
           </div>
         </div>
       </div>

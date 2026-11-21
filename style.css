@@ -9389,6 +9389,58 @@ body:not(.is-admin-user) #btnModalDeleteCustom {
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
 }
 
+.ad-gate-buffering-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.54);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  text-align: center;
+}
+
+.ad-gate-spinner {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.22);
+  border-top-color: #facc15;
+  animation: adGateSpin 0.85s linear infinite;
+}
+
+@keyframes adGateSpin {
+  to { transform: rotate(360deg); }
+}
+
+.ad-gate-buffering-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.94);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+
+.ad-gate-resume-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 22px;
+  border-radius: 999px;
+  border: none;
+  background: #facc15;
+  color: #111111;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
 .ad-gate-fallback-stage {
   position: absolute;
   inset: 0;
@@ -9678,6 +9730,567 @@ body:not(.is-admin-user) #btnModalDeleteCustom {
 @media (prefers-reduced-motion: reduce) {
   .ad-gate-fallback-glow {
     animation: none;
+  }
+}
+
+/* ==========================================================================
+   PRO PAYMENT RECEIPT & WHATSAPP APPROVAL MODAL + ADMIN RECEIPT VIEWER
+   ========================================================================== */
+
+.pro-proof-backdrop {
+  z-index: 2350;
+  padding: 16px;
+}
+
+.pro-proof-card {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: min(92vh, 840px);
+  overflow-y: auto;
+  background: linear-gradient(180deg, #171614 0%, #100f0d 100%);
+  border: 1px solid rgba(212, 175, 55, 0.34);
+  border-radius: 20px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  color: #f5f2eb;
+  padding: 24px 24px 22px;
+}
+
+.pro-proof-header {
+  padding-right: 36px;
+  margin-bottom: 18px;
+}
+
+.pro-proof-header-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.pro-proof-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(212, 175, 55, 0.16);
+  border: 1px solid rgba(212, 175, 55, 0.42);
+  color: #f4d272;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pro-proof-wa-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(37, 211, 102, 0.14);
+  border: 1px solid rgba(37, 211, 102, 0.38);
+  color: #6ee79c;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.pro-proof-header h2 {
+  margin: 0 0 6px;
+  font-size: 1.24rem;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #fffdf7;
+}
+
+.pro-proof-sub {
+  margin: 0 0 12px;
+  font-size: 0.87rem;
+  line-height: 1.48;
+  color: #c2bcb0;
+}
+
+.pro-proof-sub strong {
+  color: #6ee79c;
+}
+
+.pro-proof-account-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+  color: #d7d1c5;
+}
+
+.pro-proof-account-name {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.pro-proof-account-email {
+  color: #a9a295;
+  word-break: break-all;
+}
+
+.pro-proof-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pro-proof-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pro-proof-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #ebe6da;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pro-proof-required {
+  color: #f87171;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.pro-proof-optional {
+  color: #9b9487;
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.pro-receipt-dropzone {
+  position: relative;
+  border: 1.5px dashed rgba(212, 175, 55, 0.45);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 18px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.16s ease;
+}
+
+.pro-receipt-dropzone:hover,
+.pro-receipt-dropzone:focus-visible,
+.pro-receipt-dropzone.is-dragover {
+  border-color: #f0c95c;
+  background: rgba(212, 175, 55, 0.08);
+  outline: none;
+}
+
+.pro-receipt-dropzone.has-error {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.pro-receipt-drop-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+}
+
+.pro-receipt-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(212, 175, 55, 0.14);
+  color: #f4d272;
+}
+
+.pro-receipt-prompt-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #fffdf7;
+}
+
+.pro-receipt-prompt-sub {
+  font-size: 0.78rem;
+  color: #a9a295;
+  max-width: 340px;
+}
+
+.pro-receipt-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.pro-receipt-preview-img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #0a0908;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pro-receipt-preview-footer {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pro-receipt-file-meta {
+  font-size: 0.78rem;
+  color: #d6d0c4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pro-receipt-remove-btn {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5f2eb;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pro-receipt-remove-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.pro-proof-row-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pro-proof-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #ffffff;
+  font-size: 0.86rem;
+  font-family: inherit;
+}
+
+.pro-proof-input:focus {
+  outline: none;
+  border-color: #d4af37;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pro-proof-error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.42);
+  color: #fecaca;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.pro-proof-tip {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(37, 211, 102, 0.08);
+  border: 1px solid rgba(37, 211, 102, 0.24);
+  color: #c6f6d5;
+  font-size: 0.79rem;
+  line-height: 1.45;
+}
+
+.pro-proof-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.pro-proof-cancel-btn,
+.pro-proof-copy-btn,
+.pro-proof-done-btn {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5f2eb;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pro-proof-cancel-btn:hover,
+.pro-proof-copy-btn:hover,
+.pro-proof-done-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.pro-proof-submit-btn,
+.pro-proof-wa-link {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #25d366 0%, #16a34a 100%);
+  color: #052010;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  text-align: center;
+  box-shadow: 0 10px 24px rgba(37, 211, 102, 0.28);
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.pro-proof-submit-btn:hover,
+.pro-proof-wa-link:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.pro-proof-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pro-proof-success {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pro-proof-success-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(37, 211, 102, 0.14);
+  border: 1px solid rgba(37, 211, 102, 0.42);
+  color: #86efac;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.pro-proof-success-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.pro-proof-success-thumb {
+  width: 68px;
+  height: 68px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #0a0908;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  flex-shrink: 0;
+}
+
+.pro-proof-success-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.83rem;
+  color: #d6d0c4;
+  min-width: 0;
+}
+
+.pro-proof-success-meta strong {
+  color: #f4d272;
+}
+
+.pro-proof-receipt-link {
+  color: #6ee79c;
+  font-size: 0.79rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.pro-proof-clipboard-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(212, 175, 55, 0.09);
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  color: #f4e6b8;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.pro-proof-success-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pro-proof-share-file-btn {
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  background: rgba(212, 175, 55, 0.16);
+  color: #f4d272;
+  font-size: 0.87rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pro-proof-secondary-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pro-proof-secondary-three {
+  grid-template-columns: 1fr 1fr auto;
+}
+
+/* Admin Table Receipt Indicator & Inspector Receipt Proof Card */
+.admin-receipt-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(37, 211, 102, 0.16);
+  border: 1px solid rgba(37, 211, 102, 0.42);
+  color: #6ee79c;
+  font-size: 0.68rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.admin-proof-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(37, 211, 102, 0.06);
+  border: 1px solid rgba(37, 211, 102, 0.28);
+}
+
+.admin-proof-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-proof-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #86efac;
+}
+
+.admin-proof-reqid {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #f4d272;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.admin-proof-meta,
+.admin-proof-utr {
+  font-size: 0.77rem;
+  color: #d6d0c4;
+  line-height: 1.4;
+}
+
+.admin-proof-utr {
+  color: #fef08a;
+  font-weight: 600;
+}
+
+.admin-proof-thumb-wrap {
+  width: 100%;
+  min-height: 88px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 6px;
+}
+
+.admin-proof-thumb {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: 6px;
+  cursor: zoom-in;
+}
+
+.admin-proof-status {
+  font-size: 0.76rem;
+  color: #a9a295;
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.admin-proof-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .pro-proof-card {
+    padding: 20px 16px 18px;
+    border-radius: 16px;
+  }
+
+  .pro-proof-row-two {
+    grid-template-columns: 1fr;
+  }
+
+  .pro-proof-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .pro-proof-submit-btn,
+  .pro-proof-cancel-btn {
+    width: 100%;
+  }
+
+  .pro-proof-secondary-three {
+    grid-template-columns: 1fr;
   }
 }
 

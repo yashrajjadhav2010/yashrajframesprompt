@@ -3,12 +3,217 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const ADMIN_EMAIL = 'yashrajart1999@gmail.com';
+export const APPROVAL_WHATSAPP_NUMBER = '917588598293';
 
 const PLAN_LIMITS = {
   free: { styleLimit: 25, orderLimit: 50 },
   studio_pro: { styleLimit: 1000, orderLimit: 5000 },
   enterprise: { styleLimit: 10000, orderLimit: 50000 }
 };
+
+function getReceiptsStorageDir() {
+  const candidates = [
+    path.join(process.cwd(), '.yashraj_receipts'),
+    '/tmp/yashraj_receipts'
+  ];
+  for (const dir of candidates) {
+    try {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      return dir;
+    } catch {
+      // Try next directory
+    }
+  }
+  return '/tmp';
+}
+
+const RECEIPT_STORAGE_BUCKET = 'payment-receipts';
+let receiptBucketEnsured = false;
+
+function escapeHtmlSafe(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function verifyShareToken(expected, provided) {
+  const a = String(expected || '').trim();
+  const b = String(provided || '').trim();
+  if (!a || !b || a.length !== b.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'));
+  } catch {
+    return false;
+  }
+}
+
+async function ensureSupabaseReceiptBucket(cfg) {
+  if (receiptBucketEnsured || !cfg.supabaseUrl || !cfg.supabaseSecretKey) return receiptBucketEnsured;
+  try {
+    const res = await fetch(`${cfg.supabaseUrl}/storage/v1/bucket`, {
+      method: 'POST',
+      headers: {
+        apikey: cfg.supabaseSecretKey,
+        Authorization: `Bearer ${cfg.supabaseSecretKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        id: RECEIPT_STORAGE_BUCKET,
+        name: RECEIPT_STORAGE_BUCKET,
+        public: false,
+        file_size_limit: 3145728
+      })
+    });
+    if (res.ok || res.status === 409) {
+      receiptBucketEnsured = true;
+    }
+  } catch {
+    // Non-fatal; disk fallback still works
+  }
+  return receiptBucketEnsured;
+}
+
+async function uploadReceiptToSupabaseStorage(safeId, ext, mime, buf, metaObj) {
+  const cfg = getEnvConfig();
+  if (!cfg.supabaseUrl || !cfg.supabaseSecretKey) return false;
+  try {
+    await ensureSupabaseReceiptBucket(cfg);
+    const headersBase = {
+      apikey: cfg.supabaseSecretKey,
+      Authorization: `Bearer ${cfg.supabaseSecretKey}`,
+      'x-upsert': 'true'
+    };
+    const [imgRes, metaRes] = await Promise.all([
+      fetch(`${cfg.supabaseUrl}/storage/v1/object/${RECEIPT_STORAGE_BUCKET}/${encodeURIComponent(safeId)}.${ext}`, {
+        method: 'POST',
+        headers: { ...headersBase, 'Content-Type': mime },
+        body: buf
+      }),
+      fetch(`${cfg.supabaseUrl}/storage/v1/object/${RECEIPT_STORAGE_BUCKET}/${encodeURIComponent(safeId)}.json`, {
+        method: 'POST',
+        headers: { ...headersBase, 'Content-Type': 'application/json' },
+        body: JSON.stringify(metaObj)
+      })
+    ]);
+    return imgRes.ok && metaRes.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function readReceiptFromSupabaseStorage(safeId) {
+  const cfg = getEnvConfig();
+  if (!cfg.supabaseUrl || !cfg.supabaseSecretKey) return null;
+  try {
+    const headers = {
+      apikey: cfg.supabaseSecretKey,
+      Authorization: `Bearer ${cfg.supabaseSecretKey}`
+    };
+    const metaRes = await fetch(
+      `${cfg.supabaseUrl}/storage/v1/object/${RECEIPT_STORAGE_BUCKET}/${encodeURIComponent(safeId)}.json`,
+      { headers }
+    );
+    if (!metaRes.ok) return null;
+    const meta = await metaRes.json();
+    const ext = ['jpeg', 'png', 'webp'].includes(meta?.ext) ? meta.ext : 'jpeg';
+    const imgRes = await fetch(
+      `${cfg.supabaseUrl}/storage/v1/object/${RECEIPT_STORAGE_BUCKET}/${encodeURIComponent(safeId)}.${ext}`,
+      { headers }
+    );
+    if (!imgRes.ok) return null;
+    const arrayBuf = await imgRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuf);
+    try {
+      const dir = getReceiptsStorageDir();
+      fs.writeFileSync(path.join(dir, `${safeId}.${ext}`), buffer);
+      fs.writeFileSync(path.join(dir, `${safeId}.json`), JSON.stringify(meta));
+    } catch {
+      // Ignore cache write error
+    }
+    return { meta, buffer };
+  } catch {
+    return null;
+  }
+}
+
+async function savePaymentReceiptImage(requestId, ownerUserId, receiptDataUrl, details = {}) {
+  const raw = String(receiptDataUrl || '').trim();
+  const match = raw.match(/^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=\s]+)$/i);
+  if (!match) {
+    return { ok: false, error: 'Invalid payment receipt image. Please upload a JPG, PNG, or WebP screenshot.' };
+  }
+  const rawExt = match[1].toLowerCase();
+  const ext = rawExt === 'jpg' ? 'jpeg' : rawExt;
+  const mime = `image/${ext}`;
+  const b64 = match[2].replace(/\s+/g, '');
+  const buf = Buffer.from(b64, 'base64');
+  if (!buf.length || buf.length < 120) {
+    return { ok: false, error: 'Payment receipt image appears empty or corrupted.' };
+  }
+  if (buf.length > 2.2 * 1024 * 1024) {
+    return { ok: false, error: 'Payment receipt image is too large (max 2 MB).' };
+  }
+  const safeId = String(requestId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48);
+  if (!safeId) {
+    return { ok: false, error: 'Invalid receipt reference ID.' };
+  }
+  const shareToken = crypto.randomBytes(16).toString('hex');
+  const metaObj = {
+    requestId: safeId,
+    ownerUserId: String(ownerUserId || ''),
+    shareToken,
+    planTier: String(details.planTier || 'studio_pro'),
+    userName: String(details.userName || '').slice(0, 80),
+    userEmail: String(details.userEmail || '').slice(0, 120),
+    utrRef: String(details.utrRef || '').slice(0, 80),
+    payerNote: String(details.payerNote || '').slice(0, 180),
+    fileName: String(details.fileName || 'payment-receipt.jpg').slice(0, 80),
+    mime,
+    ext,
+    sizeBytes: buf.length,
+    savedAt: new Date().toISOString()
+  };
+
+  let diskSaved = false;
+  try {
+    const dir = getReceiptsStorageDir();
+    fs.writeFileSync(path.join(dir, `${safeId}.${ext}`), buf);
+    fs.writeFileSync(path.join(dir, `${safeId}.json`), JSON.stringify(metaObj));
+    diskSaved = true;
+  } catch (err) {
+    console.warn('[Yashraj Studio API] Could not write receipt to disk:', err?.message || err);
+  }
+
+  const cloudSaved = await uploadReceiptToSupabaseStorage(safeId, ext, mime, buf, metaObj);
+  return { ok: true, mime, ext, sizeBytes: buf.length, shareToken, diskSaved, cloudSaved };
+}
+
+async function readPaymentReceiptImage(requestId) {
+  const safeId = String(requestId || '').trim();
+  if (!/^[a-zA-Z0-9_-]{8,48}$/.test(safeId)) return null;
+  const dirs = [
+    path.join(process.cwd(), '.yashraj_receipts'),
+    '/tmp/yashraj_receipts'
+  ];
+  for (const dir of dirs) {
+    try {
+      const metaPath = path.join(dir, `${safeId}.json`);
+      if (!fs.existsSync(metaPath)) continue;
+      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+      const ext = ['jpeg', 'png', 'webp'].includes(meta?.ext) ? meta.ext : 'jpeg';
+      const imgPath = path.join(dir, `${safeId}.${ext}`);
+      if (!fs.existsSync(imgPath)) continue;
+      const buffer = fs.readFileSync(imgPath);
+      return { meta, buffer };
+    } catch {
+      // Try next dir
+    }
+  }
+  return await readReceiptFromSupabaseStorage(safeId);
+}
 
 let cachedEnv = null;
 let cachedJwks = { fetchedAt: 0, keys: [] };
@@ -437,6 +642,7 @@ function buildMergedSubscriber(clerkUser, supaRow = null, styleCount = 0, orderC
     admin_note: (typeof meta.adminNote === 'string' ? meta.adminNote : '') || (typeof supaRow?.admin_note === 'string' ? supaRow.admin_note : ''),
     approved_at: (typeof meta.approvedAt === 'string' ? meta.approvedAt : null) || (typeof supaRow?.approved_at === 'string' ? supaRow.approved_at : null),
     paused_at: (typeof meta.pausedAt === 'string' ? meta.pausedAt : null) || (typeof supaRow?.paused_at === 'string' ? supaRow.paused_at : null),
+    payment_proof: (meta.paymentProof && typeof meta.paymentProof === 'object') ? meta.paymentProof : null,
     customStyleCount: styleCount,
     shopOrderCount: orderCount
   };
@@ -619,6 +825,121 @@ export async function handleStudioApiRequest(req, res) {
     return true;
   }
 
+  // Signed public payment receipt image (for WhatsApp link preview & direct Admin viewing from WhatsApp chat)
+  const publicReceiptImgMatch = pathname.match(/^\/api\/receipt-image\/([a-zA-Z0-9_-]{8,48})\/([a-f0-9]{16,64})$/i);
+  if (publicReceiptImgMatch && method === 'GET') {
+    const reqId = publicReceiptImgMatch[1];
+    const token = publicReceiptImgMatch[2];
+    const found = await readPaymentReceiptImage(reqId);
+    if (!found) {
+      sendJson(res, 404, { ok: false, error: 'Payment receipt not found.' });
+      return true;
+    }
+    if (!verifyShareToken(found.meta?.shareToken, token)) {
+      sendJson(res, 403, { ok: false, error: 'Invalid receipt share token.' });
+      return true;
+    }
+    const ext = ['jpeg', 'png', 'webp'].includes(found.meta?.ext) ? found.meta.ext : 'jpeg';
+    res.statusCode = 200;
+    res.setHeader('Content-Type', found.meta?.mime || 'image/jpeg');
+    res.setHeader('Content-Disposition', `inline; filename="${reqId}.${ext}"`);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.end(found.buffer);
+    return true;
+  }
+
+  // Signed public payment receipt viewer page with OpenGraph og:image preview card for WhatsApp
+  const publicReceiptPageMatch = pathname.match(/^\/api\/receipt-proof\/([a-zA-Z0-9_-]{8,48})\/([a-f0-9]{16,64})$/i);
+  if (publicReceiptPageMatch && method === 'GET') {
+    const reqId = publicReceiptPageMatch[1];
+    const token = publicReceiptPageMatch[2];
+    const found = await readPaymentReceiptImage(reqId);
+    if (!found) {
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.end('<!doctype html><html><body style="background:#0f0e0c;color:#f5f2eb;font-family:system-ui;padding:32px;text-align:center;"><h2>Receipt Not Found</h2><p>This payment receipt link is no longer available.</p></body></html>');
+      return true;
+    }
+    if (!verifyShareToken(found.meta?.shareToken, token)) {
+      res.statusCode = 403;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.end('<!doctype html><html><body style="background:#0f0e0c;color:#f5f2eb;font-family:system-ui;padding:32px;text-align:center;"><h2>Invalid Receipt Link</h2></body></html>');
+      return true;
+    }
+    const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000').split(',')[0].trim();
+    const origin = `${proto}://${host}`;
+    const imgUrl = `${origin}/api/receipt-image/${encodeURIComponent(reqId)}/${encodeURIComponent(token)}`;
+    const pageUrl = `${origin}/api/receipt-proof/${encodeURIComponent(reqId)}/${encodeURIComponent(token)}`;
+    const planLabel = found.meta?.planTier === 'enterprise' ? 'Multi-Branch Enterprise (₹1,299/mo)' : 'Yashraj Pro Studio (₹499/mo)';
+    const ogTitle = `Payment Receipt · ${reqId} · Yashraj Frames Studio`;
+    const ogDesc = `${planLabel}${found.meta?.userName ? ` · ${found.meta.userName}` : ''}${found.meta?.utrRef ? ` · UTR: ${found.meta.utrRef}` : ''}`;
+
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.end(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtmlSafe(ogTitle)}</title>
+  <meta name="description" content="${escapeHtmlSafe(ogDesc)}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="${escapeHtmlSafe(ogTitle)}" />
+  <meta property="og:description" content="${escapeHtmlSafe(ogDesc)}" />
+  <meta property="og:url" content="${escapeHtmlSafe(pageUrl)}" />
+  <meta property="og:image" content="${escapeHtmlSafe(imgUrl)}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtmlSafe(ogTitle)}" />
+  <meta name="twitter:description" content="${escapeHtmlSafe(ogDesc)}" />
+  <meta name="twitter:image" content="${escapeHtmlSafe(imgUrl)}" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #0d0c0a; color: #f5f2eb; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { width: 100%; max-width: 560px; background: #171512; border: 1px solid rgba(212,175,55,0.35); border-radius: 18px; padding: 22px; box-shadow: 0 24px 64px rgba(0,0,0,0.65); }
+    .top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .badge { padding: 4px 10px; border-radius: 8px; background: rgba(37,211,102,0.16); border: 1px solid rgba(37,211,102,0.42); color: #86efac; font-size: 12px; font-weight: 700; }
+    .reqid { font-family: ui-monospace, monospace; font-size: 12px; color: #f4d272; font-weight: 700; }
+    h1 { margin: 0 0 10px; font-size: 20px; color: #fffdf7; }
+    .meta { display: grid; gap: 6px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); font-size: 13px; color: #d6d0c4; margin-bottom: 14px; }
+    .meta strong { color: #ffffff; }
+    .img-wrap { background: #070706; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); padding: 8px; text-align: center; margin-bottom: 14px; }
+    img { max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; display: block; margin: 0 auto; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .btn { flex: 1 1 180px; text-align: center; padding: 12px 16px; border-radius: 10px; font-weight: 700; font-size: 14px; text-decoration: none; }
+    .btn-primary { background: linear-gradient(135deg,#25d366,#16a34a); color: #052010; }
+    .btn-secondary { background: rgba(212,175,55,0.14); border: 1px solid rgba(212,175,55,0.42); color: #f4d272; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="top">
+      <span class="badge">YASHRAJ FRAMES · PAYMENT RECEIPT</span>
+      <span class="reqid">${escapeHtmlSafe(reqId)}</span>
+    </div>
+    <h1>Pro Upgrade Payment Proof</h1>
+    <div class="meta">
+      <div>Plan: <strong>${escapeHtmlSafe(planLabel)}</strong></div>
+      ${found.meta?.userName ? `<div>Customer: <strong>${escapeHtmlSafe(found.meta.userName)}</strong></div>` : ''}
+      ${found.meta?.userEmail ? `<div>Account Email: <strong>${escapeHtmlSafe(found.meta.userEmail)}</strong></div>` : ''}
+      ${found.meta?.utrRef ? `<div>UTR / Ref ID: <strong>${escapeHtmlSafe(found.meta.utrRef)}</strong></div>` : ''}
+      ${found.meta?.payerNote ? `<div>Note: <strong>${escapeHtmlSafe(found.meta.payerNote)}</strong></div>` : ''}
+      ${found.meta?.savedAt ? `<div>Submitted: <strong>${escapeHtmlSafe(new Date(found.meta.savedAt).toLocaleString('en-IN'))}</strong></div>` : ''}
+    </div>
+    <div class="img-wrap">
+      <img src="${escapeHtmlSafe(imgUrl)}" alt="Payment receipt screenshot for ${escapeHtmlSafe(reqId)}" />
+    </div>
+    <div class="actions">
+      <a class="btn btn-primary" href="${escapeHtmlSafe(imgUrl)}" download="${escapeHtmlSafe(reqId)}.${escapeHtmlSafe(found.meta?.ext || 'jpg')}">Download Receipt Image</a>
+      <a class="btn btn-secondary" href="${escapeHtmlSafe(origin)}/#admin">Open Admin Panel</a>
+    </div>
+  </div>
+</body>
+</html>`);
+    return true;
+  }
+
   // Public shared Studio Styles catalog (Paginated to prevent loading all cards/images at once):
   // Visual cards are visible to ALL users; prompts are included ONLY for Admin or approved active subscribers.
   if (pathname === '/api/styles' && method === 'GET') {
@@ -729,9 +1050,19 @@ export async function handleStudioApiRequest(req, res) {
     return true;
   }
 
-  // Free-trial on-demand prompt unlock (called after completing the 21s unskippable ad)
+  // Free-trial on-demand prompt unlock (requires signed-in Clerk account, called after completing the 21s unskippable ad)
   if (pathname === '/api/trial/unlock-prompt' && method === 'POST') {
     const FREE_TRIAL_LIMIT = 5;
+    const trialAuth = await authenticateRequest(req);
+    if (!trialAuth.ok || !trialAuth.user) {
+      sendJson(res, 401, {
+        ok: false,
+        requiresSignIn: true,
+        error: 'Sign in required to use your 5 Free Trial prompts.'
+      });
+      return true;
+    }
+
     const body = await readJsonBody(req);
     const styleId = String(body?.styleId ?? '').trim();
     const actionType = body?.actionType === 'ai_redirect' ? 'ai_redirect' : 'copy';
@@ -742,51 +1073,43 @@ export async function handleStudioApiRequest(req, res) {
       return true;
     }
 
-    let authedUser = null;
-    let isPaidUser = false;
+    const authedUser = trialAuth.user;
+    let isPaidUser = Boolean(trialAuth.isAdmin);
     let freeTrialUsed = null;
-    const authHeader = String(req.headers.authorization || '');
-    if (authHeader.startsWith('Bearer ')) {
-      const maybeAuth = await authenticateRequest(req);
-      if (maybeAuth.ok) {
-        authedUser = maybeAuth.user;
-        if (maybeAuth.isAdmin) {
-          isPaidUser = true;
-        } else {
-          const subRes = await supaRest(
-            `user_subscriptions?user_id=eq.${encodeURIComponent(maybeAuth.user.id)}&select=plan_status,current_period_end`
-          );
-          const supaRow = Array.isArray(subRes.data) && subRes.data[0] ? subRes.data[0] : null;
-          const merged = buildMergedSubscriber(maybeAuth.user, supaRow);
-          if (merged.plan_status === 'active') {
-            isPaidUser = true;
-          } else if (merged.plan_status === 'paused' || merged.is_expired) {
-            sendJson(res, 403, {
-              ok: false,
-              locked: true,
-              status: merged.plan_status,
-              error: merged.is_expired
-                ? 'Your access validity period has expired. Please contact Studio Admin to renew.'
-                : 'Prompt access is currently paused by Studio Admin.'
-            });
-            return true;
-          } else {
-            const currentMeta = (maybeAuth.user.public_metadata && typeof maybeAuth.user.public_metadata === 'object')
-              ? maybeAuth.user.public_metadata
-              : {};
-            const usedSoFar = Number(currentMeta.freeTrialUsed) || 0;
-            if (usedSoFar >= FREE_TRIAL_LIMIT) {
-              sendJson(res, 403, {
-                ok: false,
-                trialExhausted: true,
-                freeTrialUsed: usedSoFar,
-                error: 'All 5 free trial prompt unlocks have been used. Request Yashraj Pro approval for unlimited access.'
-              });
-              return true;
-            }
-            freeTrialUsed = usedSoFar;
-          }
+
+    if (!isPaidUser) {
+      const subRes = await supaRest(
+        `user_subscriptions?user_id=eq.${encodeURIComponent(authedUser.id)}&select=plan_status,current_period_end`
+      );
+      const supaRow = Array.isArray(subRes.data) && subRes.data[0] ? subRes.data[0] : null;
+      const merged = buildMergedSubscriber(authedUser, supaRow);
+      if (merged.plan_status === 'active') {
+        isPaidUser = true;
+      } else if (merged.plan_status === 'paused' || merged.is_expired) {
+        sendJson(res, 403, {
+          ok: false,
+          locked: true,
+          status: merged.plan_status,
+          error: merged.is_expired
+            ? 'Your access validity period has expired. Please contact Studio Admin to renew.'
+            : 'Prompt access is currently paused by Studio Admin.'
+        });
+        return true;
+      } else {
+        const currentMeta = (authedUser.public_metadata && typeof authedUser.public_metadata === 'object')
+          ? authedUser.public_metadata
+          : {};
+        const usedSoFar = Number(currentMeta.freeTrialUsed) || 0;
+        if (usedSoFar >= FREE_TRIAL_LIMIT) {
+          sendJson(res, 403, {
+            ok: false,
+            trialExhausted: true,
+            freeTrialUsed: usedSoFar,
+            error: 'All 5 free trial prompt unlocks have been used. Request Yashraj Pro approval for unlimited access.'
+          });
+          return true;
         }
+        freeTrialUsed = usedSoFar;
       }
     }
 
@@ -801,7 +1124,7 @@ export async function handleStudioApiRequest(req, res) {
       return true;
     }
 
-    if (authedUser && !isPaidUser) {
+    if (!isPaidUser) {
       const currentMeta = (authedUser.public_metadata && typeof authedUser.public_metadata === 'object')
         ? authedUser.public_metadata
         : {};
@@ -926,12 +1249,21 @@ export async function handleStudioApiRequest(req, res) {
     return true;
   }
 
-  // 2. Request plan upgrade (puts user into 'pending' approval)
+  // 2. Request plan upgrade with mandatory payment receipt proof (puts user into 'pending' approval)
   if (pathname === '/api/subscription/request' && method === 'POST') {
     const body = await readJsonBody(req);
     const planTier = String(body.planTier || '');
-    if (!PLAN_LIMITS[planTier]) {
+    if (!PLAN_LIMITS[planTier] || planTier === 'free') {
       sendJson(res, 400, { ok: false, error: 'Invalid subscription tier' });
+      return true;
+    }
+
+    const receiptDataUrl = String(body.receiptDataUrl || '').trim();
+    if (!receiptDataUrl) {
+      sendJson(res, 400, {
+        ok: false,
+        error: 'Payment receipt screenshot is required to submit a Pro approval request.'
+      });
       return true;
     }
 
@@ -943,11 +1275,51 @@ export async function handleStudioApiRequest(req, res) {
       return true;
     }
 
+    const cleanUtrRef = String(body.utrRef || '').replace(/[<>]/g, '').trim().slice(0, 80);
+    const cleanPayerNote = String(body.payerNote || '').replace(/[<>]/g, '').trim().slice(0, 180);
+    const cleanFileName = String(body.receiptFileName || 'payment-receipt.jpg').replace(/[<>]/g, '').trim().slice(0, 80);
+    const userEmail = getClerkPrimaryEmail(auth.user);
+    const userName = getClerkFullName(auth.user);
+
+    const requestId = `YFPRO-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const savedReceipt = await savePaymentReceiptImage(requestId, auth.user.id, receiptDataUrl, {
+      planTier,
+      userName,
+      userEmail,
+      utrRef: cleanUtrRef,
+      payerNote: cleanPayerNote,
+      fileName: cleanFileName
+    });
+    if (!savedReceipt.ok) {
+      sendJson(res, 400, { ok: false, error: savedReceipt.error || 'Invalid payment receipt image.' });
+      return true;
+    }
+
+    const nowIso = new Date().toISOString();
+    const shareToken = savedReceipt.shareToken || '';
+    const receiptSharePath = shareToken ? `/api/receipt-proof/${requestId}/${shareToken}` : '';
+    const receiptImageSharePath = shareToken ? `/api/receipt-image/${requestId}/${shareToken}` : '';
+
+    const paymentProof = {
+      requestId,
+      planTier,
+      utrRef: cleanUtrRef,
+      payerNote: cleanPayerNote,
+      fileName: cleanFileName,
+      receiptAttached: true,
+      receiptApiPath: `/api/subscription/receipt/${requestId}`,
+      receiptSharePath,
+      receiptImageSharePath,
+      whatsappNumber: APPROVAL_WHATSAPP_NUMBER,
+      submittedAt: nowIso
+    };
+
     const nextMeta = {
       ...currentMeta,
       planTier,
       planStatus: 'pending',
-      lastActiveAt: new Date().toISOString()
+      paymentProof,
+      lastActiveAt: nowIso
     };
 
     const clerkPatch = await clerkRequest(
@@ -960,13 +1332,39 @@ export async function handleStudioApiRequest(req, res) {
     }
 
     await syncUserSubscriptionRowToSupabase(auth.user.id, {
-      email: getClerkPrimaryEmail(auth.user),
+      email: userEmail,
       plan_tier: planTier,
       plan_status: 'pending'
     });
 
     const subscription = buildMergedSubscriber(clerkPatch.data || auth.user, null);
-    sendJson(res, 200, { ok: true, subscription });
+    sendJson(res, 200, {
+      ok: true,
+      subscription,
+      paymentProof,
+      whatsappNumber: APPROVAL_WHATSAPP_NUMBER
+    });
+    return true;
+  }
+
+  // 2b. Retrieve uploaded payment receipt image (strictly Admin or submitting owner)
+  const receiptMatch = pathname.match(/^\/api\/subscription\/receipt\/([a-zA-Z0-9_-]{8,48})$/);
+  if (receiptMatch && method === 'GET') {
+    const reqId = receiptMatch[1];
+    const found = await readPaymentReceiptImage(reqId);
+    if (!found) {
+      sendJson(res, 404, { ok: false, error: 'Payment receipt image not found.' });
+      return true;
+    }
+    const isOwner = String(found.meta?.ownerUserId || '') === String(auth.user.id || '');
+    if (!auth.isAdmin && !isOwner) {
+      sendJson(res, 403, { ok: false, error: 'Forbidden' });
+      return true;
+    }
+    res.statusCode = 200;
+    res.setHeader('Content-Type', found.meta?.mime || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.end(found.buffer);
     return true;
   }
 

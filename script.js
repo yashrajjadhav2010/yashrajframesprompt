@@ -6,7 +6,7 @@
 
 import QRCode from 'qrcode';
 import { prompts as importedPrompts, CATEGORIES as importedCategories } from './prompts.js';
-import { ADMIN_EMAIL, PUBLIC_CONTACT_EMAIL, StudioCloudSync, compressImageFileForCloud, isClerkAdminUser } from './src/lib/cloudSync.js';
+import { ADMIN_EMAIL, PUBLIC_CONTACT_EMAIL, APPROVAL_WHATSAPP_NUMBER, APPROVAL_WHATSAPP_DISPLAY, StudioCloudSync, compressImageFileForCloud, isClerkAdminUser } from './src/lib/cloudSync.js';
 import { initPwaSupport } from './src/lib/pwa.js';
 
 (function () {
@@ -176,13 +176,28 @@ import { initPwaSupport } from './src/lib/pwa.js';
       timerId: null,
       elapsedMs: 0,
       lastTickAt: 0,
+      maxWatchedVideoSec: 0,
+      lastVideoTime: 0,
+      stallTicks: 0,
+      hasStartedVideo: false,
       fallbackMode: false,
       muted: false,
       pendingPayload: null,
       resolvedPrompt: '',
       resolvedUrl: '',
       resolvePromise: null
-    }
+    },
+    proProof: {
+      tier: 'studio_pro',
+      file: null,
+      fileName: '',
+      dataUrl: '',
+      whatsappUrl: '',
+      whatsappText: '',
+      submitting: false
+    },
+    adminReceiptObjectUrl: '',
+    adminReceiptLoadedKey: ''
   };
 
   const promptList = (Array.isArray(importedPrompts) && importedPrompts.length > 0)
@@ -287,6 +302,36 @@ import { initPwaSupport } from './src/lib/pwa.js';
     btnSyncLocalToCloud: document.getElementById('btnSyncLocalToCloud'),
     lblActivePlanCaption: document.getElementById('lblActivePlanCaption'),
     subscriptionTiersGrid: document.getElementById('subscriptionTiersGrid'),
+    proPaymentProofModal: document.getElementById('proPaymentProofModal'),
+    proProofCloseBtn: document.getElementById('proProofCloseBtn'),
+    lblProProofPlanBadge: document.getElementById('lblProProofPlanBadge'),
+    lblProProofPlanTitle: document.getElementById('lblProProofPlanTitle'),
+    lblProProofUserName: document.getElementById('lblProProofUserName'),
+    lblProProofUserEmail: document.getElementById('lblProProofUserEmail'),
+    proProofFormSection: document.getElementById('proProofFormSection'),
+    proReceiptDropzone: document.getElementById('proReceiptDropzone'),
+    inputProReceiptFile: document.getElementById('inputProReceiptFile'),
+    proReceiptDropPrompt: document.getElementById('proReceiptDropPrompt'),
+    proReceiptPreviewWrap: document.getElementById('proReceiptPreviewWrap'),
+    imgProReceiptPreview: document.getElementById('imgProReceiptPreview'),
+    lblProReceiptFileMeta: document.getElementById('lblProReceiptFileMeta'),
+    btnProReceiptRemove: document.getElementById('btnProReceiptRemove'),
+    inputProUtrRef: document.getElementById('inputProUtrRef'),
+    inputProPayerNote: document.getElementById('inputProPayerNote'),
+    proProofErrorBox: document.getElementById('proProofErrorBox'),
+    btnCancelProProof: document.getElementById('btnCancelProProof'),
+    btnSubmitProProof: document.getElementById('btnSubmitProProof'),
+    proProofSuccessSection: document.getElementById('proProofSuccessSection'),
+    imgProSuccessThumb: document.getElementById('imgProSuccessThumb'),
+    lblProSuccessReqId: document.getElementById('lblProSuccessReqId'),
+    lblProSuccessPlan: document.getElementById('lblProSuccessPlan'),
+    linkProReceiptView: document.getElementById('linkProReceiptView'),
+    lblProClipboardStatus: document.getElementById('lblProClipboardStatus'),
+    linkProSuccessWhatsApp: document.getElementById('linkProSuccessWhatsApp'),
+    btnProShareReceiptFile: document.getElementById('btnProShareReceiptFile'),
+    btnProCopyReceiptImg: document.getElementById('btnProCopyReceiptImg'),
+    btnProCopyWaMsg: document.getElementById('btnProCopyWaMsg'),
+    btnProProofDone: document.getElementById('btnProProofDone'),
     clerkAuthHostModal: document.getElementById('clerkAuthHostModal'),
     clerkAuthHostCloseBtn: document.getElementById('clerkAuthHostCloseBtn'),
     clerkAuthMountNode: document.getElementById('clerkAuthMountNode'),
@@ -406,6 +451,9 @@ import { initPwaSupport } from './src/lib/pwa.js';
     lblAdGateCountdown: document.getElementById('lblAdGateCountdown'),
     adGateVideoStage: document.getElementById('adGateVideoStage'),
     adGateVideo: document.getElementById('adGateVideo'),
+    adGateBufferingOverlay: document.getElementById('adGateBufferingOverlay'),
+    lblAdGateBufferingText: document.getElementById('lblAdGateBufferingText'),
+    btnAdGateResumePlay: document.getElementById('btnAdGateResumePlay'),
     btnAdGateUnmutePrompt: document.getElementById('btnAdGateUnmutePrompt'),
     adGateFallbackStage: document.getElementById('adGateFallbackStage'),
     lblAdGateFallbackNote: document.getElementById('lblAdGateFallbackNote'),
@@ -482,6 +530,13 @@ import { initPwaSupport } from './src/lib/pwa.js';
     adminInspCustomDate: document.getElementById('adminInspCustomDate'),
     adminInspExpiryReadout: document.getElementById('adminInspExpiryReadout'),
     btnAdminApplyValidity: document.getElementById('btnAdminApplyValidity'),
+    adminInspPaymentProofBox: document.getElementById('adminInspPaymentProofBox'),
+    lblAdminInspProofReqId: document.getElementById('lblAdminInspProofReqId'),
+    lblAdminInspProofMeta: document.getElementById('lblAdminInspProofMeta'),
+    lblAdminInspProofUtr: document.getElementById('lblAdminInspProofUtr'),
+    imgAdminInspReceipt: document.getElementById('imgAdminInspReceipt'),
+    lblAdminInspReceiptStatus: document.getElementById('lblAdminInspReceiptStatus'),
+    btnAdminInspViewReceipt: document.getElementById('btnAdminInspViewReceipt'),
     adminInspNoteInput: document.getElementById('adminInspNoteInput'),
     btnAdminSaveNote: document.getElementById('btnAdminSaveNote'),
     btnAdminInspApprove: document.getElementById('btnAdminInspApprove'),
@@ -952,12 +1007,21 @@ import { initPwaSupport } from './src/lib/pwa.js';
     };
   }
 
-  function readFreeTrialCookie() {
+  function getActiveTrialUserId() {
+    if (typeof cloudSync !== 'undefined' && cloudSync.user && cloudSync.user.id) {
+      return String(cloudSync.user.id).replace(/[^a-zA-Z0-9_-]/g, '');
+    }
+    return '';
+  }
+
+  function readFreeTrialCookie(userId = getActiveTrialUserId()) {
+    if (!userId) return 0;
+    const cookieKey = `${FREE_TRIAL_COOKIE_NAME}_${userId}`;
     try {
       const cookies = String(document.cookie || '').split(';');
       for (const item of cookies) {
         const [k, v] = item.trim().split('=');
-        if (k === FREE_TRIAL_COOKIE_NAME) {
+        if (k === cookieKey) {
           const parsed = Number(decodeURIComponent(v || '0'));
           if (Number.isFinite(parsed) && parsed >= 0) return parsed;
         }
@@ -968,33 +1032,41 @@ import { initPwaSupport } from './src/lib/pwa.js';
     return 0;
   }
 
-  function loadFreeTrialUsed() {
+  function loadFreeTrialUsed(userId = getActiveTrialUserId()) {
+    if (!userId) return 0;
     let localCount = 0;
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.FREE_TRIAL_USES);
+      const raw = localStorage.getItem(`${STORAGE_KEYS.FREE_TRIAL_USES}_${userId}`);
       const parsed = Number(raw);
       if (Number.isFinite(parsed) && parsed >= 0) localCount = parsed;
     } catch {
       // Ignore storage errors
     }
-    const cookieCount = readFreeTrialCookie();
+    const cookieCount = readFreeTrialCookie(userId);
     return Math.max(0, Math.min(FREE_TRIAL_LIMIT, Math.max(localCount, cookieCount)));
   }
 
   function saveFreeTrialUsed(nextCount) {
+    const userId = getActiveTrialUserId();
     const clamped = Math.max(0, Math.min(FREE_TRIAL_LIMIT, Math.floor(Number(nextCount) || 0)));
-    state.freeTrialUsed = Math.max(state.freeTrialUsed || 0, clamped);
+    if (!userId) {
+      state.freeTrialUsed = 0;
+      return 0;
+    }
+    const prevForUser = loadFreeTrialUsed(userId);
+    const merged = Math.max(prevForUser, clamped);
+    state.freeTrialUsed = merged;
     try {
-      localStorage.setItem(STORAGE_KEYS.FREE_TRIAL_USES, String(state.freeTrialUsed));
+      localStorage.setItem(`${STORAGE_KEYS.FREE_TRIAL_USES}_${userId}`, String(merged));
     } catch {
       // Ignore storage quota errors
     }
     try {
-      document.cookie = `${FREE_TRIAL_COOKIE_NAME}=${encodeURIComponent(String(state.freeTrialUsed))}; path=/; max-age=31536000; SameSite=Lax`;
+      document.cookie = `${FREE_TRIAL_COOKIE_NAME}_${userId}=${encodeURIComponent(String(merged))}; path=/; max-age=31536000; SameSite=Lax`;
     } catch {
       // Ignore cookie write errors
     }
-    return state.freeTrialUsed;
+    return merged;
   }
 
   function getPromptAccessState() {
@@ -1013,13 +1085,30 @@ import { initPwaSupport } from './src/lib/pwa.js';
 
   function getFreeTrialState() {
     const access = getPromptAccessState();
+    const isSignedIn = Boolean(typeof cloudSync !== 'undefined' && cloudSync.user);
     const isPaid = Boolean(access.allowed);
-    const cloudUsed = (typeof cloudSync !== 'undefined' && cloudSync.user)
-      ? (Number(cloudSync.getActivePlanMeta().freeTrialUsed) || 0)
-      : 0;
-    const localUsed = Math.max(Number(state.freeTrialUsed) || 0, loadFreeTrialUsed());
+
+    if (!isSignedIn) {
+      state.freeTrialUsed = 0;
+      return {
+        isSignedIn: false,
+        requiresSignIn: true,
+        isPaid: false,
+        access,
+        used: 0,
+        limit: FREE_TRIAL_LIMIT,
+        remaining: FREE_TRIAL_LIMIT,
+        canUseTrial: false,
+        exhausted: false,
+        blockedByAccountStatus: false
+      };
+    }
+
+    const userId = getActiveTrialUserId();
+    const cloudUsed = Number(cloudSync.getActivePlanMeta().freeTrialUsed) || 0;
+    const localUsed = loadFreeTrialUsed(userId);
     const used = Math.max(0, Math.min(FREE_TRIAL_LIMIT, Math.max(localUsed, cloudUsed)));
-    if (used > state.freeTrialUsed) {
+    if (used !== state.freeTrialUsed || used > localUsed) {
       saveFreeTrialUsed(used);
     }
     const remaining = Math.max(0, FREE_TRIAL_LIMIT - used);
@@ -1027,6 +1116,8 @@ import { initPwaSupport } from './src/lib/pwa.js';
     const canUseTrial = !isPaid && !blockedByAccountStatus && remaining > 0;
     const exhausted = !isPaid && !blockedByAccountStatus && remaining <= 0;
     return {
+      isSignedIn: true,
+      requiresSignIn: false,
       isPaid,
       access,
       used,
@@ -1045,8 +1136,16 @@ import { initPwaSupport } from './src/lib/pwa.js';
   function updateFreeTrialIndicators() {
     const trial = getFreeTrialState();
     if (dom.feedFreeTrialPill) {
+      const ctaEl = dom.feedFreeTrialPill.querySelector('.free-trial-cta');
       if (trial.isPaid || trial.blockedByAccountStatus) {
         dom.feedFreeTrialPill.style.display = 'none';
+      } else if (trial.requiresSignIn) {
+        dom.feedFreeTrialPill.style.display = 'inline-flex';
+        dom.feedFreeTrialPill.classList.remove('is-exhausted');
+        if (dom.lblFeedFreeTrialText) {
+          dom.lblFeedFreeTrialText.textContent = `Sign In for ${trial.limit} Free Trial Prompts (21s ad)`;
+        }
+        if (ctaEl) ctaEl.textContent = 'Sign In →';
       } else {
         dom.feedFreeTrialPill.style.display = 'inline-flex';
         dom.feedFreeTrialPill.classList.toggle('is-exhausted', trial.exhausted);
@@ -1055,6 +1154,7 @@ import { initPwaSupport } from './src/lib/pwa.js';
             ? `Free Trial Used (${trial.limit}/${trial.limit}) · Upgrade for Unlimited`
             : `Free Trial · ${trial.remaining} of ${trial.limit} prompts left (21s ad)`;
         }
+        if (ctaEl) ctaEl.textContent = 'Go Ad-Free →';
       }
     }
     if (dom.modalFreeTrialBanner && dom.lblModalFreeTrialCount) {
@@ -1071,19 +1171,14 @@ import { initPwaSupport } from './src/lib/pwa.js';
     const trial = getFreeTrialState();
     const access = trial.access;
     if (trial.isPaid || trial.canUseTrial) return true;
-    if (trial.exhausted) {
-      if (access.status === 'signed_out') {
-        showToast(`Free trial complete (${trial.limit}/${trial.limit} used)! Sign in & request Yashraj Pro approval for unlimited ad-free access.`);
-        openClerkAuthModal('signIn');
-      } else {
-        showToast(`Free trial complete (${trial.limit}/${trial.limit} used)! Request Yashraj Pro approval from Studio Admin for unlimited ad-free prompts.`);
-        openAccountPlanModal();
-      }
+    if (trial.requiresSignIn || access.status === 'signed_out') {
+      showToast(`Sign in to unlock your ${trial.limit} Free Trial prompts (with 21s preview ad) or request Yashraj Pro.`);
+      openClerkAuthModal('signIn');
       return false;
     }
-    if (access.status === 'signed_out') {
-      showToast(`Sign in and get Studio Admin approval to unlock ${actionLabel}.`);
-      openClerkAuthModal('signIn');
+    if (trial.exhausted) {
+      showToast(`Free trial complete (${trial.limit}/${trial.limit} used)! Request Yashraj Pro approval from Studio Admin for unlimited ad-free prompts.`);
+      openAccountPlanModal();
       return false;
     }
     const msg = access.isExpired
@@ -1119,8 +1214,22 @@ import { initPwaSupport } from './src/lib/pwa.js';
     }
   }
 
+  function setAdGateBufferingUI(visible, message = 'Loading Yashraj Frames ad...', showResumeBtn = false) {
+    if (dom.adGateBufferingOverlay) {
+      dom.adGateBufferingOverlay.style.display = visible ? 'flex' : 'none';
+    }
+    if (dom.lblAdGateBufferingText && message) {
+      dom.lblAdGateBufferingText.textContent = message;
+    }
+    if (dom.btnAdGateResumePlay) {
+      dom.btnAdGateResumePlay.style.display = (visible && showResumeBtn) ? 'inline-flex' : 'none';
+    }
+  }
+
   function showAdGateFallbackStage(reasonText) {
     state.adGate.fallbackMode = true;
+    state.adGate.lastTickAt = performance.now();
+    setAdGateBufferingUI(false);
     if (dom.adGateVideo) {
       try { dom.adGateVideo.pause(); } catch {}
       dom.adGateVideo.style.display = 'none';
@@ -1132,12 +1241,80 @@ import { initPwaSupport } from './src/lib/pwa.js';
     }
   }
 
+  function syncAdGateVideoProgress() {
+    if (!state.adGate.active || state.adGate.completed || state.adGate.fallbackMode || !dom.adGateVideo) return;
+    const video = dom.adGateVideo;
+    const cur = Number(video.currentTime) || 0;
+    const durationSec = (Number.isFinite(video.duration) && video.duration > 1)
+      ? video.duration
+      : AD_GATE_DURATION_SEC;
+
+    // Anti-seek guard: block jumping ahead past actually watched playback
+    if (cur > state.adGate.maxWatchedVideoSec + 1.15) {
+      video.currentTime = state.adGate.maxWatchedVideoSec;
+      return;
+    }
+
+    const isActivelyPlaying = !video.paused && !video.ended && video.readyState >= 3;
+    const progressed = cur > state.adGate.lastVideoTime + 0.01;
+
+    if (isActivelyPlaying && cur > state.adGate.maxWatchedVideoSec) {
+      state.adGate.maxWatchedVideoSec = cur;
+      state.adGate.hasStartedVideo = true;
+    }
+
+    if (progressed || (isActivelyPlaying && cur > 0.05)) {
+      state.adGate.stallTicks = 0;
+      state.adGate.hasStartedVideo = true;
+    } else if (!video.ended) {
+      state.adGate.stallTicks += 1;
+    }
+
+    state.adGate.lastVideoTime = cur;
+
+    const watchedSec = Math.min(durationSec, state.adGate.maxWatchedVideoSec);
+    const pct = Math.min(99.5, (watchedSec / durationSec) * 100);
+    const secondsLeft = Math.max(1, Math.ceil(durationSec - watchedSec));
+
+    if (dom.adGateProgressFill) {
+      dom.adGateProgressFill.style.width = `${pct.toFixed(1)}%`;
+    }
+
+    const isPausedByDevice = video.paused && !document.hidden && video.readyState >= 3 && state.adGate.stallTicks >= 4;
+    const isBufferingNow = !video.ended && (video.readyState < 3 || video.paused || state.adGate.stallTicks >= 4);
+
+    if (isBufferingNow) {
+      if (!state.adGate.hasStartedVideo) {
+        setAdGateBufferingUI(
+          true,
+          isPausedByDevice ? 'Tap below to start the ad video' : 'Loading Yashraj Frames ad...',
+          isPausedByDevice
+        );
+        if (dom.lblAdGateCountdown) dom.lblAdGateCountdown.textContent = 'Loading ad...';
+      } else {
+        setAdGateBufferingUI(
+          true,
+          isPausedByDevice ? 'Ad paused — tap to continue' : 'Low network · Buffering video...',
+          isPausedByDevice
+        );
+        if (dom.lblAdGateCountdown) dom.lblAdGateCountdown.textContent = `Buffering · ${secondsLeft}s`;
+      }
+      return;
+    }
+
+    setAdGateBufferingUI(false);
+    if (dom.lblAdGateCountdown) {
+      dom.lblAdGateCountdown.textContent = `Reward in ${secondsLeft}s`;
+    }
+  }
+
   function closeAdGateModal(force = false) {
     if (!force && state.adGate.active && !state.adGate.completed) return;
     if (state.adGate.timerId) {
       clearInterval(state.adGate.timerId);
       state.adGate.timerId = null;
     }
+    setAdGateBufferingUI(false);
     if (dom.adGateVideo) {
       try {
         dom.adGateVideo.pause();
@@ -1150,6 +1327,10 @@ import { initPwaSupport } from './src/lib/pwa.js';
     const resolveFn = state.adGate.resolvePromise;
     state.adGate.active = false;
     state.adGate.completed = false;
+    state.adGate.maxWatchedVideoSec = 0;
+    state.adGate.lastVideoTime = 0;
+    state.adGate.stallTicks = 0;
+    state.adGate.hasStartedVideo = false;
     state.adGate.pendingPayload = null;
     state.adGate.resolvedPrompt = '';
     state.adGate.resolvedUrl = '';
@@ -1212,6 +1393,7 @@ import { initPwaSupport } from './src/lib/pwa.js';
       clearInterval(state.adGate.timerId);
       state.adGate.timerId = null;
     }
+    setAdGateBufferingUI(false);
     if (dom.adGateProgressFill) dom.adGateProgressFill.style.width = '100%';
     if (dom.lblAdGateCountdown) {
       dom.lblAdGateCountdown.textContent = 'Ad Complete ✓';
@@ -1256,14 +1438,18 @@ import { initPwaSupport } from './src/lib/pwa.js';
           saveFreeTrialUsed(Math.max(trialBefore.used + 1, unlocked.freeTrialUsed));
           serverCountApplied = true;
         }
-      } else if (unlocked?.code === 'TRIAL_EXHAUSTED') {
+      } else if (unlocked?.requiresSignIn || unlocked?.status === 401) {
+        closeAdGateModal(true);
+        enforceLockedPromptAction(actionType === 'ai_redirect' ? 'AI Auto Take' : 'Prompt copy');
+        return;
+      } else if (unlocked?.trialExhausted || unlocked?.code === 'TRIAL_EXHAUSTED') {
         saveFreeTrialUsed(FREE_TRIAL_LIMIT);
         updateAccountAndSubscriptionUI();
         closeAdGateModal(true);
         enforceLockedPromptAction(actionType === 'ai_redirect' ? 'AI Auto Take' : 'Prompt copy');
         return;
       } else if (!rawPrompt) {
-        showToast(unlocked?.reason || 'Could not unlock prompt right now. Please try again.');
+        showToast(unlocked?.error || unlocked?.reason || 'Could not unlock prompt right now. Please try again.');
         closeAdGateModal(true);
         return;
       }
@@ -1411,6 +1597,10 @@ import { initPwaSupport } from './src/lib/pwa.js';
       state.adGate.completed = false;
       state.adGate.elapsedMs = 0;
       state.adGate.lastTickAt = performance.now();
+      state.adGate.maxWatchedVideoSec = 0;
+      state.adGate.lastVideoTime = 0;
+      state.adGate.stallTicks = 0;
+      state.adGate.hasStartedVideo = false;
       state.adGate.fallbackMode = false;
       state.adGate.muted = false;
       state.adGate.pendingPayload = payload;
@@ -1427,10 +1617,10 @@ import { initPwaSupport } from './src/lib/pwa.js';
       }
       if (dom.lblAdGateTrialHint) {
         const nextUseNumber = Math.min(trial.limit, trial.used + 1);
-        dom.lblAdGateTrialHint.textContent = `Free Trial (${nextUseNumber} of ${trial.limit}) · Unlocks automatically after 21s (unskippable)`;
+        dom.lblAdGateTrialHint.textContent = `Free Trial (${nextUseNumber} of ${trial.limit}) · Unlocks automatically after the full video completes`;
       }
       if (dom.lblAdGateCountdown) {
-        dom.lblAdGateCountdown.textContent = `Reward in ${AD_GATE_DURATION_SEC}s`;
+        dom.lblAdGateCountdown.textContent = 'Loading ad...';
         dom.lblAdGateCountdown.classList.remove('is-done');
       }
       if (dom.adGateProgressFill) dom.adGateProgressFill.style.width = '0%';
@@ -1445,6 +1635,7 @@ import { initPwaSupport } from './src/lib/pwa.js';
         dom.adGateVideo.style.display = 'block';
         dom.adGateVideo.muted = false;
         dom.adGateVideo.volume = 1;
+        setAdGateBufferingUI(true, 'Loading Yashraj Frames ad...', false);
         try {
           dom.adGateVideo.currentTime = 0;
           if (dom.adGateVideo.networkState === 3 || dom.adGateVideo.error) {
@@ -1461,13 +1652,14 @@ import { initPwaSupport } from './src/lib/pwa.js';
               const mutedRetry = dom.adGateVideo.play();
               if (mutedRetry && typeof mutedRetry.catch === 'function') {
                 mutedRetry.catch(() => {
-                  showAdGateFallbackStage('Yashraj Frames Showcase · Auto-playing preview');
+                  // Let user tap Resume rather than skipping the video
+                  setAdGateBufferingUI(true, 'Tap below to play the Yashraj Frames ad', true);
                 });
               }
             });
           }
         } catch {
-          showAdGateFallbackStage('Yashraj Frames Showcase · Auto-playing preview');
+          setAdGateBufferingUI(true, 'Tap below to play the Yashraj Frames ad', true);
         }
       } else {
         showAdGateFallbackStage('Yashraj Frames Showcase');
@@ -1476,7 +1668,6 @@ import { initPwaSupport } from './src/lib/pwa.js';
       updateAdGateMuteUI();
 
       const totalMs = AD_GATE_DURATION_SEC * 1000;
-      let videoStallCheckMs = 0;
 
       state.adGate.timerId = setInterval(() => {
         if (!state.adGate.active || state.adGate.completed) return;
@@ -1485,17 +1676,21 @@ import { initPwaSupport } from './src/lib/pwa.js';
           state.adGate.lastTickAt = now;
           return;
         }
+
+        // Video Mode: progress & completion are driven STRICTLY by real video playback (never finishes while loading/buffering)
+        if (!state.adGate.fallbackMode && dom.adGateVideo) {
+          if (dom.adGateVideo.error || dom.adGateVideo.networkState === 3) {
+            showAdGateFallbackStage('Yashraj Frames Studio Preview');
+            return;
+          }
+          syncAdGateVideoProgress();
+          return;
+        }
+
+        // Branded Fallback Mode (only if video file truly errored out with no valid source)
         const delta = Math.min(500, Math.max(0, now - state.adGate.lastTickAt));
         state.adGate.lastTickAt = now;
         state.adGate.elapsedMs += delta;
-
-        // Only switch to branded showcase fallback if video errored out or failed to find any source
-        if (!state.adGate.fallbackMode && dom.adGateVideo) {
-          videoStallCheckMs += delta;
-          if (dom.adGateVideo.error || (videoStallCheckMs >= 4500 && dom.adGateVideo.readyState < 1 && dom.adGateVideo.networkState === 3)) {
-            showAdGateFallbackStage('Yashraj Frames Studio Preview');
-          }
-        }
 
         const pct = Math.min(100, (state.adGate.elapsedMs / totalMs) * 100);
         const secondsLeft = Math.max(0, Math.ceil((totalMs - state.adGate.elapsedMs) / 1000));
@@ -1507,7 +1702,7 @@ import { initPwaSupport } from './src/lib/pwa.js';
         if (state.adGate.elapsedMs >= totalMs) {
           void finalizeAdGateCompletion();
         }
-      }, 150);
+      }, 180);
     });
   }
 
@@ -2684,6 +2879,7 @@ import { initPwaSupport } from './src/lib/pwa.js';
         }
         const reqBtn = card.querySelector('[data-request-tier]');
         if (reqBtn) {
+          const hasReceipt = Boolean(cloudSync.subscription?.payment_proof?.receiptAttached);
           if (!user) {
             reqBtn.disabled = false;
             reqBtn.textContent = tier === 'studio_pro' ? 'Request Pro Approval' : 'Request Enterprise Approval';
@@ -2691,8 +2887,10 @@ import { initPwaSupport } from './src/lib/pwa.js';
             reqBtn.disabled = true;
             reqBtn.textContent = 'Approved & Active';
           } else if (isCurrent && plan.status === 'pending') {
-            reqBtn.disabled = true;
-            reqBtn.textContent = 'Awaiting Admin Approval';
+            reqBtn.disabled = false;
+            reqBtn.textContent = hasReceipt
+              ? 'Resend Receipt on WhatsApp'
+              : (tier === 'studio_pro' ? 'Upload Receipt & Request Pro' : 'Upload Receipt & Request Enterprise');
           } else {
             reqBtn.disabled = false;
             reqBtn.textContent = tier === 'studio_pro' ? 'Request Pro Approval' : 'Request Enterprise Approval';
@@ -2710,6 +2908,252 @@ import { initPwaSupport } from './src/lib/pwa.js';
     if (adminAllowed && window.location.hash === '#admin' && state.currentView !== 'admin') {
       switchView('admin');
     }
+  }
+
+  function getProTierMeta(tier) {
+    if (tier === 'enterprise') {
+      return { id: 'enterprise', name: 'Multi-Branch Enterprise', price: '₹1,299/mo' };
+    }
+    return { id: 'studio_pro', name: 'Yashraj Pro Studio', price: '₹499/mo' };
+  }
+
+  function setProProofError(message) {
+    if (!dom.proProofErrorBox) return;
+    if (!message) {
+      dom.proProofErrorBox.style.display = 'none';
+      dom.proProofErrorBox.textContent = '';
+      if (dom.proReceiptDropzone) dom.proReceiptDropzone.classList.remove('has-error');
+      return;
+    }
+    dom.proProofErrorBox.textContent = message;
+    dom.proProofErrorBox.style.display = 'block';
+  }
+
+  function clearProReceiptSelection() {
+    state.proProof.file = null;
+    state.proProof.fileName = '';
+    state.proProof.dataUrl = '';
+    if (dom.inputProReceiptFile) dom.inputProReceiptFile.value = '';
+    if (dom.imgProReceiptPreview) dom.imgProReceiptPreview.removeAttribute('src');
+    if (dom.proReceiptPreviewWrap) dom.proReceiptPreviewWrap.style.display = 'none';
+    if (dom.proReceiptDropPrompt) dom.proReceiptDropPrompt.style.display = 'flex';
+    if (dom.lblProReceiptFileMeta) dom.lblProReceiptFileMeta.textContent = '';
+  }
+
+  function openProPaymentProofModal(tier) {
+    if (!dom.proPaymentProofModal) return;
+    if (!cloudSync.user) {
+      closeAccountPlanModal();
+      void openClerkAuthModal('signIn');
+      return;
+    }
+    const tierMeta = getProTierMeta(tier);
+    state.proProof.tier = tierMeta.id;
+    state.proProof.submitting = false;
+    state.proProof.whatsappUrl = '';
+    state.proProof.whatsappText = '';
+    clearProReceiptSelection();
+    setProProofError('');
+
+    if (dom.lblProProofPlanBadge) dom.lblProProofPlanBadge.textContent = `${tierMeta.name} · ${tierMeta.price}`;
+    if (dom.lblProProofPlanTitle) dom.lblProProofPlanTitle.textContent = `Submit Payment Receipt for ${tierMeta.name}`;
+    if (dom.lblProProofUserName) dom.lblProProofUserName.textContent = cloudSync.user.fullName || 'Studio Subscriber';
+    if (dom.lblProProofUserEmail) dom.lblProProofUserEmail.textContent = cloudSync.user.email || cloudSync.user.id || '';
+    if (dom.inputProUtrRef) dom.inputProUtrRef.value = '';
+    if (dom.inputProPayerNote) dom.inputProPayerNote.value = '';
+    if (dom.btnSubmitProProof) {
+      dom.btnSubmitProProof.disabled = false;
+      dom.btnSubmitProProof.textContent = `Submit & Send on WhatsApp (${APPROVAL_WHATSAPP_DISPLAY})`;
+    }
+    if (dom.proProofFormSection) dom.proProofFormSection.style.display = 'flex';
+    if (dom.proProofSuccessSection) dom.proProofSuccessSection.style.display = 'none';
+
+    dom.proPaymentProofModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeProPaymentProofModal() {
+    if (!dom.proPaymentProofModal) return;
+    dom.proPaymentProofModal.classList.remove('active');
+    if (!dom.accountPlanModal || !dom.accountPlanModal.classList.contains('active')) {
+      document.body.style.overflow = '';
+    }
+  }
+
+  async function handleProReceiptFileSelected(file) {
+    if (!file) return;
+    if (!file.type || !file.type.startsWith('image/')) {
+      setProProofError('Please select a valid image file (JPG, PNG, or WebP screenshot of your payment receipt).');
+      if (dom.proReceiptDropzone) dom.proReceiptDropzone.classList.add('has-error');
+      return;
+    }
+    setProProofError('');
+    try {
+      const compressedDataUrl = await compressImageFileForCloud(file, 1280, 0.84);
+      state.proProof.file = file;
+      state.proProof.fileName = file.name || 'payment-receipt.jpg';
+      state.proProof.dataUrl = compressedDataUrl;
+
+      const approxKb = Math.max(1, Math.round((compressedDataUrl.length * 3) / 4 / 1024));
+      if (dom.imgProReceiptPreview) dom.imgProReceiptPreview.src = compressedDataUrl;
+      if (dom.lblProReceiptFileMeta) dom.lblProReceiptFileMeta.textContent = `${state.proProof.fileName} (${approxKb} KB)`;
+      if (dom.proReceiptDropPrompt) dom.proReceiptDropPrompt.style.display = 'none';
+      if (dom.proReceiptPreviewWrap) dom.proReceiptPreviewWrap.style.display = 'flex';
+      if (dom.proReceiptDropzone) dom.proReceiptDropzone.classList.remove('has-error');
+    } catch (err) {
+      setProProofError(err?.message || 'Could not read that screenshot. Please try another JPG/PNG image.');
+    }
+  }
+
+  async function copyReceiptImageToClipboard(dataUrl) {
+    if (!dataUrl || typeof navigator === 'undefined' || !navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+      return false;
+    }
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error('Image load failed'));
+        el.src = dataUrl;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width || 800;
+      canvas.height = img.naturalHeight || img.height || 800;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+      ctx.drawImage(img, 0, 0);
+      const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!pngBlob) return false;
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function buildProWhatsAppMessage({ userName, userEmail, planName, planPrice, requestId, utrRef, payerNote, receiptUrl }) {
+    const lines = [
+      '*YASHRAJ FRAMES - AI STUDIO*',
+      '*Pro Approval Request + Payment Receipt*',
+      '',
+      `Request ID: ${requestId || 'PENDING'}`,
+      `Plan: ${planName} (${planPrice})`,
+      `Name: ${userName || 'Studio User'}`,
+      `Account Email: ${userEmail || 'N/A'}`
+    ];
+    if (utrRef) lines.push(`UTR / Ref ID: ${utrRef}`);
+    if (payerNote) lines.push(`Note: ${payerNote}`);
+    if (receiptUrl) {
+      lines.push('');
+      lines.push('*Payment Receipt Screenshot:*');
+      lines.push(receiptUrl);
+    }
+    lines.push('');
+    lines.push('Please verify my payment receipt and approve Pro access.');
+    return lines.join('\n');
+  }
+
+  async function submitProPaymentProof() {
+    if (state.proProof.submitting) return;
+    if (!cloudSync.user) {
+      closeProPaymentProofModal();
+      await openClerkAuthModal('signIn');
+      return;
+    }
+    if (!state.proProof.dataUrl) {
+      setProProofError('Payment receipt or screenshot is required before sending your Pro approval request.');
+      if (dom.proReceiptDropzone) {
+        dom.proReceiptDropzone.classList.add('has-error');
+        dom.proReceiptDropzone.focus();
+      }
+      return;
+    }
+
+    const tierMeta = getProTierMeta(state.proProof.tier);
+    const utrRef = (dom.inputProUtrRef?.value || '').trim().slice(0, 64);
+    const payerNote = (dom.inputProPayerNote?.value || '').trim().slice(0, 160);
+
+    state.proProof.submitting = true;
+    setProProofError('');
+    if (dom.btnSubmitProProof) {
+      dom.btnSubmitProProof.disabled = true;
+      dom.btnSubmitProProof.textContent = 'Uploading Receipt & Preparing WhatsApp...';
+    }
+
+    const res = await cloudSync.requestSubscriptionUpgrade(tierMeta.id, {
+      utrRef,
+      payerNote,
+      receiptFileName: state.proProof.fileName || 'payment-receipt.jpg',
+      receiptDataUrl: state.proProof.dataUrl
+    });
+
+    state.proProof.submitting = false;
+    if (dom.btnSubmitProProof) {
+      dom.btnSubmitProProof.disabled = false;
+      dom.btnSubmitProProof.textContent = `Submit & Send on WhatsApp (${APPROVAL_WHATSAPP_DISPLAY})`;
+    }
+
+    if (!res.ok) {
+      setProProofError(res.error || 'Could not submit payment receipt. Please try again.');
+      return;
+    }
+
+    const requestId = res.paymentProof?.requestId || `YFPRO-${Date.now().toString(36).toUpperCase()}`;
+    const targetWaNumber = String(res.whatsappNumber || APPROVAL_WHATSAPP_NUMBER).replace(/\D/g, '') || APPROVAL_WHATSAPP_NUMBER;
+    const sharePath = res.paymentProof?.receiptSharePath || '';
+    const receiptUrl = sharePath ? new URL(sharePath, window.location.origin).href : '';
+    const waText = buildProWhatsAppMessage({
+      userName: cloudSync.user.fullName || 'Studio Subscriber',
+      userEmail: cloudSync.user.email || cloudSync.user.id || '',
+      planName: tierMeta.name,
+      planPrice: tierMeta.price,
+      requestId,
+      utrRef,
+      payerNote,
+      receiptUrl
+    });
+    const waUrl = `https://wa.me/${targetWaNumber}?text=${encodeURIComponent(waText)}`;
+    state.proProof.whatsappText = waText;
+    state.proProof.whatsappUrl = waUrl;
+
+    const copiedImage = await copyReceiptImageToClipboard(state.proProof.dataUrl);
+
+    updateAccountAndSubscriptionUI();
+
+    if (dom.imgProSuccessThumb) dom.imgProSuccessThumb.src = state.proProof.dataUrl;
+    if (dom.lblProSuccessReqId) dom.lblProSuccessReqId.textContent = requestId;
+    if (dom.lblProSuccessPlan) dom.lblProSuccessPlan.textContent = `${tierMeta.name} (${tierMeta.price})`;
+    if (dom.linkProReceiptView) {
+      dom.linkProReceiptView.href = receiptUrl || '#';
+      dom.linkProReceiptView.style.display = receiptUrl ? 'inline-block' : 'none';
+    }
+    if (dom.linkProSuccessWhatsApp) dom.linkProSuccessWhatsApp.href = waUrl;
+    const canNativeShareFile = Boolean(
+      state.proProof.file
+      && typeof navigator !== 'undefined'
+      && typeof navigator.share === 'function'
+      && typeof navigator.canShare === 'function'
+      && navigator.canShare({ files: [state.proProof.file] })
+    );
+    if (dom.btnProShareReceiptFile) {
+      dom.btnProShareReceiptFile.style.display = canNativeShareFile ? 'inline-flex' : 'none';
+    }
+    if (dom.lblProClipboardStatus) {
+      if (copiedImage) {
+        dom.lblProClipboardStatus.textContent = 'Receipt link is included in your WhatsApp message AND the screenshot image is copied to your clipboard — press Ctrl+V (Paste) in WhatsApp chat to send the photo too!';
+      } else if (canNativeShareFile) {
+        dom.lblProClipboardStatus.textContent = 'Receipt link is included inside your WhatsApp message. You can also tap "Share Actual Receipt Photo to WhatsApp" below to send the photo file directly.';
+      } else {
+        dom.lblProClipboardStatus.textContent = 'Receipt link is included inside your WhatsApp message to 7588598293. Tap "Copy Receipt Image" below to paste the photo directly in WhatsApp chat.';
+      }
+    }
+    if (dom.proProofFormSection) dom.proProofFormSection.style.display = 'none';
+    if (dom.proProofSuccessSection) dom.proProofSuccessSection.style.display = 'flex';
+
+    openExternalUrl(waUrl);
+    showToast(copiedImage
+      ? `Receipt link ready & image copied! Press Ctrl+V in WhatsApp (${APPROVAL_WHATSAPP_DISPLAY}).`
+      : `Receipt uploaded! Opening WhatsApp (${APPROVAL_WHATSAPP_DISPLAY}) with receipt link...`);
   }
 
   function openAccountPlanModal() {
@@ -5323,7 +5767,7 @@ Looking forward to welcoming you! Thank you.`);
                     ? `<img class="admin-user-avatar" src="${escapeHtml(u.avatar_url)}" alt="" referrerPolicy="no-referrer" />`
                     : `<div class="admin-user-initials">${escapeHtml(initials)}</div>`}
                   <div class="admin-user-meta">
-                    <strong>${escapeHtml(displayName)}${isSelfAdmin ? ' <span class="admin-owner-tag">Admin</span>' : ''}</strong>
+                    <strong>${escapeHtml(displayName)}${isSelfAdmin ? ' <span class="admin-owner-tag">Admin</span>' : ''}${u.payment_proof?.receiptAttached ? ' <span class="admin-receipt-badge" title="Payment receipt attached">Receipt</span>' : ''}</strong>
                     <span class="admin-user-email">${escapeHtml(u.email || u.user_id)}</span>
                     ${u.last_prompt_title ? `<span class="admin-last-prompt">Last: ${escapeHtml(u.last_prompt_title)}</span>` : ''}
                   </div>
@@ -5434,6 +5878,76 @@ Looking forward to welcoming you! Thank you.`);
           }
         }
         if (dom.btnAdminApplyValidity) dom.btnAdminApplyValidity.disabled = isSelf;
+        if (dom.adminInspPaymentProofBox) {
+          const proof = selectedUser.payment_proof && typeof selectedUser.payment_proof === 'object'
+            ? selectedUser.payment_proof
+            : null;
+          if (!proof || !proof.receiptAttached) {
+            dom.adminInspPaymentProofBox.style.display = 'none';
+            state.adminReceiptLoadedKey = '';
+          } else {
+            dom.adminInspPaymentProofBox.style.display = 'flex';
+            if (dom.lblAdminInspProofReqId) dom.lblAdminInspProofReqId.textContent = proof.requestId || 'RECEIPT';
+            const proofPlan = getPlanDisplayName(proof.planTier || selectedUser.plan_tier);
+            const submittedAgo = proof.submittedAt ? formatRelativeTime(proof.submittedAt) : 'recently';
+            if (dom.lblAdminInspProofMeta) {
+              dom.lblAdminInspProofMeta.textContent = `${proofPlan} · Sent ${submittedAgo} · WhatsApp ${APPROVAL_WHATSAPP_DISPLAY}`;
+            }
+            if (dom.lblAdminInspProofUtr) {
+              const parts = [];
+              if (proof.utrRef) parts.push(`UTR: ${proof.utrRef}`);
+              if (proof.payerNote) parts.push(`Note: ${proof.payerNote}`);
+              if (parts.length > 0) {
+                dom.lblAdminInspProofUtr.textContent = parts.join(' · ');
+                dom.lblAdminInspProofUtr.style.display = 'block';
+              } else {
+                dom.lblAdminInspProofUtr.style.display = 'none';
+              }
+            }
+            const receiptKey = `${selectedUser.user_id}:${proof.requestId || proof.receiptApiPath || ''}`;
+            if (state.adminReceiptLoadedKey !== receiptKey) {
+              state.adminReceiptLoadedKey = receiptKey;
+              if (state.adminReceiptObjectUrl) {
+                try { URL.revokeObjectURL(state.adminReceiptObjectUrl); } catch (_) { /* ignore */ }
+                state.adminReceiptObjectUrl = '';
+              }
+              if (dom.imgAdminInspReceipt) {
+                dom.imgAdminInspReceipt.style.display = 'none';
+                dom.imgAdminInspReceipt.removeAttribute('src');
+              }
+              if (dom.btnAdminInspViewReceipt) dom.btnAdminInspViewReceipt.disabled = true;
+              if (dom.lblAdminInspReceiptStatus) {
+                dom.lblAdminInspReceiptStatus.style.display = 'block';
+                dom.lblAdminInspReceiptStatus.textContent = 'Loading payment receipt...';
+              }
+              const targetUserId = selectedUser.user_id;
+              const apiPath = proof.receiptApiPath || '';
+              if (apiPath) {
+                cloudSync.fetchPaymentReceiptObjectUrl(apiPath).then((objUrl) => {
+                  if (state.admin.selectedUserId !== targetUserId || state.adminReceiptLoadedKey !== receiptKey) {
+                    if (objUrl) {
+                      try { URL.revokeObjectURL(objUrl); } catch (_) { /* ignore */ }
+                    }
+                    return;
+                  }
+                  if (objUrl) {
+                    state.adminReceiptObjectUrl = objUrl;
+                    if (dom.imgAdminInspReceipt) {
+                      dom.imgAdminInspReceipt.src = objUrl;
+                      dom.imgAdminInspReceipt.style.display = 'block';
+                    }
+                    if (dom.lblAdminInspReceiptStatus) dom.lblAdminInspReceiptStatus.style.display = 'none';
+                    if (dom.btnAdminInspViewReceipt) dom.btnAdminInspViewReceipt.disabled = false;
+                  } else if (dom.lblAdminInspReceiptStatus) {
+                    dom.lblAdminInspReceiptStatus.textContent = 'Receipt preview unavailable on server (check WhatsApp 7588598293).';
+                  }
+                });
+              } else if (dom.lblAdminInspReceiptStatus) {
+                dom.lblAdminInspReceiptStatus.textContent = 'Receipt sent via WhatsApp (7588598293).';
+              }
+            }
+          }
+        }
         if (dom.adminInspNoteInput) dom.adminInspNoteInput.value = selectedUser.admin_note || '';
         if (dom.btnAdminInspApprove) {
           dom.btnAdminInspApprove.disabled = isSelf;
@@ -5941,10 +6455,10 @@ Looking forward to welcoming you! Thank you.`);
       if (dom.modalSubscriptionLockedCard) {
         dom.modalSubscriptionLockedCard.style.display = 'flex';
         if (dom.lblModalLockTitle) {
-          if (trial.exhausted) {
+          if (trial.requiresSignIn || access.status === 'signed_out') {
+            dom.lblModalLockTitle.textContent = `Sign In for ${trial.limit} Free Trial Prompts`;
+          } else if (trial.exhausted) {
             dom.lblModalLockTitle.textContent = `Free Trial Complete (${trial.limit}/${trial.limit} Prompts Used)`;
-          } else if (access.status === 'signed_out') {
-            dom.lblModalLockTitle.textContent = 'Sign In & Admin Approval Required';
           } else if (access.isExpired) {
             dom.lblModalLockTitle.textContent = 'Access Validity Expired';
           } else if (access.status === 'pending') {
@@ -5954,10 +6468,10 @@ Looking forward to welcoming you! Thank you.`);
           }
         }
         if (dom.lblModalLockDesc) {
-          if (trial.exhausted) {
-            dom.lblModalLockDesc.textContent = `You have used all ${trial.limit} free trial prompts. Sign in and request Yashraj Pro approval from Studio Admin (${PUBLIC_CONTACT_EMAIL}) for unlimited ad-free prompt copying and instant AI Auto Take.`;
-          } else if (access.status === 'signed_out') {
-            dom.lblModalLockDesc.textContent = `You must sign in and be manually approved by Studio Admin (${PUBLIC_CONTACT_EMAIL}) before viewing prompts, copying, or using AI Auto Take.`;
+          if (trial.requiresSignIn || access.status === 'signed_out') {
+            dom.lblModalLockDesc.textContent = `Sign in to unlock ${trial.limit} free trial prompts (with a short 21s Yashraj Frames preview ad), or request Yashraj Pro approval from Studio Admin (${PUBLIC_CONTACT_EMAIL}) for unlimited ad-free access.`;
+          } else if (trial.exhausted) {
+            dom.lblModalLockDesc.textContent = `You have used all ${trial.limit} free trial prompts. Request Yashraj Pro approval from Studio Admin (${PUBLIC_CONTACT_EMAIL}) for unlimited ad-free prompt copying and instant AI Auto Take.`;
           } else if (access.isExpired) {
             const valSummary = formatValiditySummary({
               isAdmin: false,
@@ -5973,12 +6487,10 @@ Looking forward to welcoming you! Thank you.`);
           }
         }
         if (dom.lblModalLockAccountBtn) {
-          if (trial.exhausted) {
-            dom.lblModalLockAccountBtn.textContent = access.status === 'signed_out'
-              ? 'Sign In & Unlock Unlimited Pro'
-              : 'Request Unlimited Ad-Free Pro';
-          } else if (access.status === 'signed_out') {
-            dom.lblModalLockAccountBtn.textContent = 'Sign In to Request Access';
+          if (trial.requiresSignIn || access.status === 'signed_out') {
+            dom.lblModalLockAccountBtn.textContent = 'Sign In to Start Free Trial';
+          } else if (trial.exhausted) {
+            dom.lblModalLockAccountBtn.textContent = 'Request Unlimited Ad-Free Pro';
           } else if (access.isExpired) {
             dom.lblModalLockAccountBtn.textContent = 'View Renewal Details';
           } else if (access.status === 'pending') {
@@ -6722,25 +7234,120 @@ Looking forward to welcoming you! Thank you.`);
       });
     }
 
-    // Account Subscription Tier Request Buttons
+    // Account Subscription Tier Request Buttons -> Open Mandatory Payment Receipt & WhatsApp Modal
     if (dom.subscriptionTiersGrid) {
       dom.subscriptionTiersGrid.addEventListener('click', async (e) => {
         const reqBtn = e.target.closest('[data-request-tier]');
-        if (!reqBtn) return;
+        if (!reqBtn || reqBtn.disabled) return;
         const tier = reqBtn.getAttribute('data-request-tier');
         if (!cloudSync.user) {
           closeAccountPlanModal();
           await openClerkAuthModal('signIn');
           return;
         }
-        reqBtn.disabled = true;
-        const res = await cloudSync.requestSubscriptionUpgrade(tier);
-        updateAccountAndSubscriptionUI();
-        if (res.ok) {
-          showToast(`Subscription request sent to Studio Admin (${PUBLIC_CONTACT_EMAIL}) for approval!`);
-        } else {
-          showToast(`Unable to send request: ${res.error || 'Check Supabase connection'}`);
+        openProPaymentProofModal(tier);
+      });
+    }
+
+    // Pro Payment Receipt & WhatsApp Approval Modal Listeners
+    if (dom.proProofCloseBtn) dom.proProofCloseBtn.addEventListener('click', closeProPaymentProofModal);
+    if (dom.btnCancelProProof) dom.btnCancelProProof.addEventListener('click', closeProPaymentProofModal);
+    if (dom.btnProProofDone) dom.btnProProofDone.addEventListener('click', closeProPaymentProofModal);
+    if (dom.proPaymentProofModal) {
+      dom.proPaymentProofModal.addEventListener('click', (e) => {
+        if (e.target === dom.proPaymentProofModal) closeProPaymentProofModal();
+      });
+    }
+    if (dom.proReceiptDropzone && dom.inputProReceiptFile) {
+      dom.proReceiptDropzone.addEventListener('click', (e) => {
+        if (e.target.closest('#btnProReceiptRemove')) return;
+        dom.inputProReceiptFile.click();
+      });
+      dom.proReceiptDropzone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          dom.inputProReceiptFile.click();
         }
+      });
+      dom.proReceiptDropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dom.proReceiptDropzone.classList.add('is-dragover');
+      });
+      dom.proReceiptDropzone.addEventListener('dragleave', () => {
+        dom.proReceiptDropzone.classList.remove('is-dragover');
+      });
+      dom.proReceiptDropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dom.proReceiptDropzone.classList.remove('is-dragover');
+        const droppedFile = e.dataTransfer?.files?.[0];
+        if (droppedFile) void handleProReceiptFileSelected(droppedFile);
+      });
+      dom.inputProReceiptFile.addEventListener('change', (e) => {
+        const pickedFile = e.target.files?.[0];
+        if (pickedFile) void handleProReceiptFileSelected(pickedFile);
+      });
+    }
+    if (dom.btnProReceiptRemove && dom.inputProReceiptFile) {
+      dom.btnProReceiptRemove.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearProReceiptSelection();
+        dom.inputProReceiptFile.click();
+      });
+    }
+    if (dom.btnSubmitProProof) {
+      dom.btnSubmitProProof.addEventListener('click', () => {
+        void submitProPaymentProof();
+      });
+    }
+    if (dom.linkProSuccessWhatsApp) {
+      dom.linkProSuccessWhatsApp.addEventListener('click', () => {
+        if (state.proProof.dataUrl) {
+          void copyReceiptImageToClipboard(state.proProof.dataUrl);
+        }
+      });
+    }
+    if (dom.btnProCopyReceiptImg) {
+      dom.btnProCopyReceiptImg.addEventListener('click', async () => {
+        if (!state.proProof.dataUrl) return;
+        const ok = await copyReceiptImageToClipboard(state.proProof.dataUrl);
+        showToast(ok
+          ? 'Receipt screenshot copied! Press Ctrl+V inside WhatsApp chat to paste it.'
+          : 'Your browser blocked image copy — the receipt link is already in the WhatsApp message!');
+      });
+    }
+    if (dom.btnProCopyWaMsg) {
+      dom.btnProCopyWaMsg.addEventListener('click', async () => {
+        if (!state.proProof.whatsappText) return;
+        try {
+          await navigator.clipboard.writeText(state.proProof.whatsappText);
+          showToast('WhatsApp message with receipt link copied!');
+        } catch (_) {
+          showToast('Could not copy message automatically');
+        }
+      });
+    }
+    if (dom.btnProShareReceiptFile) {
+      dom.btnProShareReceiptFile.addEventListener('click', async () => {
+        if (!state.proProof.file || typeof navigator.share !== 'function') return;
+        try {
+          await navigator.share({
+            title: 'Yashraj Pro Payment Receipt',
+            text: state.proProof.whatsappText,
+            files: [state.proProof.file]
+          });
+        } catch (_) {
+          // User cancelled native share sheet
+        }
+      });
+    }
+    if (dom.btnAdminInspViewReceipt) {
+      dom.btnAdminInspViewReceipt.addEventListener('click', () => {
+        if (state.adminReceiptObjectUrl) openLightbox(state.adminReceiptObjectUrl);
+      });
+    }
+    if (dom.imgAdminInspReceipt) {
+      dom.imgAdminInspReceipt.addEventListener('click', () => {
+        if (state.adminReceiptObjectUrl) openLightbox(state.adminReceiptObjectUrl);
       });
     }
 
@@ -7325,27 +7932,77 @@ Looking forward to welcoming you! Thank you.`);
         }
       });
     }
+    if (dom.btnAdGateResumePlay) {
+      dom.btnAdGateResumePlay.addEventListener('click', () => {
+        if (!state.adGate.active || state.adGate.completed || !dom.adGateVideo) return;
+        setAdGateBufferingUI(true, 'Resuming ad...', false);
+        const p = dom.adGateVideo.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {
+            state.adGate.muted = true;
+            dom.adGateVideo.muted = true;
+            updateAdGateMuteUI();
+            dom.adGateVideo.play().catch(() => {});
+          });
+        }
+      });
+    }
     if (dom.adGateVideo) {
       dom.adGateVideo.addEventListener('contextmenu', (e) => e.preventDefault());
+      const videoSources = dom.adGateVideo.querySelectorAll('source');
+      const lastSource = videoSources[videoSources.length - 1];
+      if (lastSource) {
+        lastSource.addEventListener('error', () => {
+          if (state.adGate.active && !state.adGate.completed && dom.adGateVideo.networkState === 3) {
+            showAdGateFallbackStage('Yashraj Frames Studio Preview');
+          }
+        });
+      }
       dom.adGateVideo.addEventListener('error', () => {
         if (state.adGate.active && !state.adGate.completed) {
           showAdGateFallbackStage('Yashraj Frames Studio Preview');
         }
       });
-      // Prevent seeking ahead to skip the 21s ad
-      const guardVideoSeek = () => {
-        if (!state.adGate.active || state.adGate.completed || state.adGate.fallbackMode) return;
-        const maxAllowedSec = (state.adGate.elapsedMs / 1000) + 1.25;
-        if (dom.adGateVideo.currentTime > maxAllowedSec) {
-          dom.adGateVideo.currentTime = Math.max(0, state.adGate.elapsedMs / 1000);
-        }
-      };
-      dom.adGateVideo.addEventListener('seeking', guardVideoSeek);
-      dom.adGateVideo.addEventListener('timeupdate', guardVideoSeek);
-      // If the video file is shorter than 21s, seamlessly loop it until the full 21s finishes
-      dom.adGateVideo.addEventListener('ended', () => {
+      dom.adGateVideo.addEventListener('waiting', () => {
         if (state.adGate.active && !state.adGate.completed && !state.adGate.fallbackMode) {
-          dom.adGateVideo.currentTime = 0;
+          syncAdGateVideoProgress();
+        }
+      });
+      dom.adGateVideo.addEventListener('stalled', () => {
+        if (state.adGate.active && !state.adGate.completed && !state.adGate.fallbackMode) {
+          syncAdGateVideoProgress();
+        }
+      });
+      dom.adGateVideo.addEventListener('playing', () => {
+        if (state.adGate.active && !state.adGate.completed && !state.adGate.fallbackMode) {
+          state.adGate.stallTicks = 0;
+          state.adGate.hasStartedVideo = true;
+          setAdGateBufferingUI(false);
+          syncAdGateVideoProgress();
+        }
+      });
+      dom.adGateVideo.addEventListener('seeking', () => {
+        if (!state.adGate.active || state.adGate.completed || state.adGate.fallbackMode) return;
+        if (dom.adGateVideo.currentTime > state.adGate.maxWatchedVideoSec + 1.15) {
+          dom.adGateVideo.currentTime = state.adGate.maxWatchedVideoSec;
+        }
+      });
+      dom.adGateVideo.addEventListener('timeupdate', () => {
+        if (state.adGate.active && !state.adGate.completed && !state.adGate.fallbackMode) {
+          syncAdGateVideoProgress();
+        }
+      });
+      // Complete ONLY when the full video actually finishes playing from start to finish
+      dom.adGateVideo.addEventListener('ended', () => {
+        if (!state.adGate.active || state.adGate.completed || state.adGate.fallbackMode) return;
+        const durationSec = (Number.isFinite(dom.adGateVideo.duration) && dom.adGateVideo.duration > 1)
+          ? dom.adGateVideo.duration
+          : AD_GATE_DURATION_SEC;
+        if (state.adGate.maxWatchedVideoSec >= Math.max(0.5, durationSec - 1.25)) {
+          void finalizeAdGateCompletion();
+        } else {
+          // Guard against forced skip to end: resume from last watched position
+          dom.adGateVideo.currentTime = state.adGate.maxWatchedVideoSec;
           dom.adGateVideo.play().catch(() => {});
         }
       });
@@ -7633,6 +8290,7 @@ Looking forward to welcoming you! Thank you.`);
         if (dom.studioLegalModal && dom.studioLegalModal.classList.contains('active')) closeStudioLegalModal();
         else if (dom.iosInstallGuideModal && dom.iosInstallGuideModal.classList.contains('active')) dom.iosInstallGuideModal.classList.remove('active');
         else if (dom.mobileToolsSheet && dom.mobileToolsSheet.classList.contains('active')) closeMobileToolsSheet();
+        else if (dom.proPaymentProofModal && dom.proPaymentProofModal.classList.contains('active')) closeProPaymentProofModal();
         else if (dom.accountPlanModal && dom.accountPlanModal.classList.contains('active')) closeAccountPlanModal();
         else if (dom.aiAutoTakeModal && dom.aiAutoTakeModal.classList.contains('active')) closeAiLauncherModal();
         else if (dom.presetPickerModal && dom.presetPickerModal.classList.contains('active')) closePresetPicker();

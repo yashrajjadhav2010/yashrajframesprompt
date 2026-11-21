@@ -105,6 +105,8 @@ function getAppBaseUrl() {
 
 export const ADMIN_EMAIL = 'yashrajart1999@gmail.com';
 export const PUBLIC_CONTACT_EMAIL = 'tech.yashrajframes@gmail.com';
+export const APPROVAL_WHATSAPP_NUMBER = '917588598293';
+export const APPROVAL_WHATSAPP_DISPLAY = '7588598293';
 
 export function isClerkAdminUser(user) {
   if (!user) return false;
@@ -1125,13 +1127,19 @@ export class StudioCloudSync {
   }
 
   async unlockTrialPrompt({ styleId, actionType = 'copy', aiTarget = null } = {}) {
+    if (!this.user) {
+      return { ok: false, status: 401, requiresSignIn: true, error: 'Sign in required to use Free Trial prompts.' };
+    }
     if (!styleId) return { ok: false, error: 'Missing styleId' };
     try {
-      const headers = { 'Content-Type': 'application/json' };
-      if (this.user) {
-        const token = await this.getClerkSessionToken();
-        if (token) headers.Authorization = `Bearer ${token}`;
+      const token = await this.getClerkSessionToken();
+      if (!token) {
+        return { ok: false, status: 401, requiresSignIn: true, error: 'Sign in required to use Free Trial prompts.' };
       }
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      };
       const resp = await fetch('/api/trial/unlock-prompt', {
         method: 'POST',
         headers,
@@ -1151,6 +1159,7 @@ export class StudioCloudSync {
         prompt: data.prompt || '',
         freeTrialUsed: typeof data.freeTrialUsed === 'number' ? data.freeTrialUsed : null,
         trialExhausted: Boolean(data.trialExhausted),
+        requiresSignIn: Boolean(data.requiresSignIn || resp.status === 401),
         error: data.error || ''
       };
     } catch (err) {
@@ -1158,13 +1167,22 @@ export class StudioCloudSync {
     }
   }
 
-  async requestSubscriptionUpgrade(planTier) {
+  async requestSubscriptionUpgrade(planTier, proof = {}) {
     if (!this.user) return { ok: false, error: 'Sign in first' };
     if (!PLAN_CATALOG[planTier]) return { ok: false, error: 'Invalid plan tier' };
+    if (!proof || !proof.receiptDataUrl) {
+      return { ok: false, error: 'Please upload your payment receipt screenshot first.' };
+    }
 
     const res = await this.apiFetch('/api/subscription/request', {
       method: 'POST',
-      body: { planTier }
+      body: {
+        planTier,
+        utrRef: String(proof.utrRef || '').trim(),
+        payerNote: String(proof.payerNote || '').trim(),
+        receiptFileName: String(proof.receiptFileName || 'payment-receipt.jpg').trim(),
+        receiptDataUrl: String(proof.receiptDataUrl || '')
+      }
     });
 
     if (!res.ok) {
@@ -1174,7 +1192,29 @@ export class StudioCloudSync {
       this.subscription = res.data.subscription;
       this.notifyAuthChange();
     }
-    return { ok: true, subscription: res.data?.subscription || null };
+    return {
+      ok: true,
+      subscription: res.data?.subscription || null,
+      paymentProof: res.data?.paymentProof || null,
+      whatsappNumber: res.data?.whatsappNumber || APPROVAL_WHATSAPP_NUMBER
+    };
+  }
+
+  async fetchPaymentReceiptObjectUrl(receiptApiPath) {
+    if (!receiptApiPath || !this.user) return '';
+    try {
+      const token = await this.getClerkSessionToken();
+      if (!token) return '';
+      const resp = await fetch(receiptApiPath, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!resp.ok) return '';
+      const blob = await resp.blob();
+      return URL.createObjectURL(blob);
+    } catch {
+      return '';
+    }
   }
 
   async fetchAdminDashboardData() {
