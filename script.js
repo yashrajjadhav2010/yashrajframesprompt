@@ -177,7 +177,7 @@ import { initPwaSupport } from './src/lib/pwa.js';
       elapsedMs: 0,
       lastTickAt: 0,
       fallbackMode: false,
-      muted: true,
+      muted: false,
       pendingPayload: null,
       resolvedPrompt: '',
       resolvedUrl: '',
@@ -1412,7 +1412,7 @@ import { initPwaSupport } from './src/lib/pwa.js';
       state.adGate.elapsedMs = 0;
       state.adGate.lastTickAt = performance.now();
       state.adGate.fallbackMode = false;
-      state.adGate.muted = true;
+      state.adGate.muted = false;
       state.adGate.pendingPayload = payload;
       state.adGate.resolvedPrompt = '';
       state.adGate.resolvedUrl = '';
@@ -1430,16 +1430,21 @@ import { initPwaSupport } from './src/lib/pwa.js';
         dom.lblAdGateTrialHint.textContent = `Free Trial (${nextUseNumber} of ${trial.limit}) · Unlocks automatically after 21s (unskippable)`;
       }
       if (dom.lblAdGateCountdown) {
-        dom.lblAdGateCountdown.textContent = `Ad · ${AD_GATE_DURATION_SEC}s left`;
+        dom.lblAdGateCountdown.textContent = `Reward in ${AD_GATE_DURATION_SEC}s`;
         dom.lblAdGateCountdown.classList.remove('is-done');
       }
       if (dom.adGateProgressFill) dom.adGateProgressFill.style.width = '0%';
       if (dom.adGateRunningBar) dom.adGateRunningBar.style.display = 'flex';
       if (dom.adGateCompleteBar) dom.adGateCompleteBar.style.display = 'none';
       if (dom.adGateFallbackStage) dom.adGateFallbackStage.style.display = 'none';
+
+      dom.studioAdGateModal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+
       if (dom.adGateVideo) {
         dom.adGateVideo.style.display = 'block';
-        dom.adGateVideo.muted = true;
+        dom.adGateVideo.muted = false;
+        dom.adGateVideo.volume = 1;
         try {
           dom.adGateVideo.currentTime = 0;
           if (dom.adGateVideo.networkState === 3 || dom.adGateVideo.error) {
@@ -1448,7 +1453,17 @@ import { initPwaSupport } from './src/lib/pwa.js';
           const playPromise = dom.adGateVideo.play();
           if (playPromise && typeof playPromise.catch === 'function') {
             playPromise.catch(() => {
-              showAdGateFallbackStage('Yashraj Frames Showcase · Auto-playing preview');
+              // If browser autoplay policy blocked unmuted playback, seamlessly retry muted and show Tap for Sound
+              if (!state.adGate.active || state.adGate.completed) return;
+              state.adGate.muted = true;
+              dom.adGateVideo.muted = true;
+              updateAdGateMuteUI();
+              const mutedRetry = dom.adGateVideo.play();
+              if (mutedRetry && typeof mutedRetry.catch === 'function') {
+                mutedRetry.catch(() => {
+                  showAdGateFallbackStage('Yashraj Frames Showcase · Auto-playing preview');
+                });
+              }
             });
           }
         } catch {
@@ -1459,8 +1474,6 @@ import { initPwaSupport } from './src/lib/pwa.js';
       }
 
       updateAdGateMuteUI();
-      dom.studioAdGateModal.classList.add('active');
-      document.body.style.overflow = 'hidden';
 
       const totalMs = AD_GATE_DURATION_SEC * 1000;
       let videoStallCheckMs = 0;
@@ -1476,10 +1489,10 @@ import { initPwaSupport } from './src/lib/pwa.js';
         state.adGate.lastTickAt = now;
         state.adGate.elapsedMs += delta;
 
-        // If yashrajframead.mp4 failed to buffer/load after 1.6s, switch smoothly to the branded showcase card
+        // Only switch to branded showcase fallback if video errored out or failed to find any source
         if (!state.adGate.fallbackMode && dom.adGateVideo) {
           videoStallCheckMs += delta;
-          if (videoStallCheckMs >= 1600 && (dom.adGateVideo.readyState < 2 || dom.adGateVideo.error)) {
+          if (dom.adGateVideo.error || (videoStallCheckMs >= 4500 && dom.adGateVideo.readyState < 1 && dom.adGateVideo.networkState === 3)) {
             showAdGateFallbackStage('Yashraj Frames Studio Preview');
           }
         }
@@ -1488,7 +1501,7 @@ import { initPwaSupport } from './src/lib/pwa.js';
         const secondsLeft = Math.max(0, Math.ceil((totalMs - state.adGate.elapsedMs) / 1000));
         if (dom.adGateProgressFill) dom.adGateProgressFill.style.width = `${pct.toFixed(1)}%`;
         if (dom.lblAdGateCountdown) {
-          dom.lblAdGateCountdown.textContent = secondsLeft > 0 ? `Ad · ${secondsLeft}s left` : 'Unlocking...';
+          dom.lblAdGateCountdown.textContent = secondsLeft > 0 ? `Reward in ${secondsLeft}s` : 'Unlocking...';
         }
 
         if (state.adGate.elapsedMs >= totalMs) {
