@@ -238,7 +238,85 @@ const prompts = [
   prompt: `Ultra-high-resolution 4K upscaling based on a given reference image. Absolute fidelity to the original facial anatomy, proportions, and identity. Maintain expression, gaze, pose, camera angle, framing, and perspective without distortion. Clothing, hair, skin, and background elements must remain unchanged in structure, placement, and design. Restore fine details with natural realism. Enhance pores, fine lines, hair strands, eyelashes, fabric weaves, seams, and material edges without adding stylization. Maintain the original color science, white balance, and tonal relationships exactly as captured. Lighting direction, intensity, contrast, and shadow behavior must match the source image exactly, only with increased clarity and expanded dynamic range. No relighting, no reshaping. Remove noise. Apply controlled sharpening and reconstruct high-frequency details. Eliminate compression artifacts and noise while maintaining authentic textures. No smoothing, no plastic skin, no artificial shine. Facial features must remain consistent throughout the image with coherent anatomy and clean, stable edges. Negative constraints: no distortion, no facial shifts, no addition or subtraction of anatomy, no changes to hands, no shape changes, no perspective shifts, no text or graphics, no hallucinated details, no stylized rendering. The final result should look like a photorealistic scale-up that matches the reference exactly, only clearer, sharper, and higher resolution.`,
   featured: false,
   tags: ["Upscale", "Restoration", "Photorealistic", "4K"]
+},
+{
+  id: 22,
+  title: "Calendar Month Festive Portrait Collage",
+  category: "Birthday",
+  description: "Soft studio backdrop with a multi-pose side collage, traditional festive attire, and a clean calendar grid with a highlighted date.",
+  thumbnail: "assets/prompts/24.jpg",
+  referenceImage: "assets/prompts/24.jpg",
+  prompt: `A clean, celebratory birthday poster design on a soft light-grey gradient background with subtle confetti sparkles[cite: 15]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[cite: 15]. On the left side, a three-quarter portrait of the subject wearing ornate traditional festive attire and jewelry blends softly into the background at the waist[cite: 15]. On the right side, a staggered vertical column of three white-bordered rectangular photo frames displays different candid poses and distances of the exact same subject[cite: 15]. Below the main portrait, stylish black cursive script reads "september" accented with small golden confetti specks, above a clean calendar grid with day headers "S M T W T F S", numbered dates, and a red heart highlighting a special birthday date[cite: 15]. Crisp photographic clarity, soft studio lighting, absolute face consistency[cite: 15].`,
+  featured: false,
+  tags: ["Birthday", "Calendar", "Festive", "Collage"]
+},
+{
+  id: 23,
+  title: "Ride-On Car Vertical Strip Birthday Collage",
+  category: "Birthday",
+  description: "Clean white backdrop with vertical monochrome photo strips, a vibrant red ride-on car centerpiece, and bold stacked birthday typography.",
+  thumbnail: "assets/prompts/25.jpg",
+  referenceImage: "assets/prompts/25.jpg",
+  prompt: `A clean, celebratory birthday poster design on a solid white background with soft bottom edge fading[cite: 14]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes[cite: 14]. Behind the central figure, vertical rectangular monochrome (black-and-white) photo strips of staggered heights display multiple candid portraits and joyful expressions of the exact same subject[cite: 14]. In the center foreground, a full-color portrait of the subject sitting inside a bright red ride-on toy SUV with glowing headlights[cite: 14]. Below the car, bold tall black condensed sans-serif typography reads "BIRTHDAY" with a warm gold-brown banner label reading "HAPPY" overlapping the center, followed by spaced uppercase text "[YOUR NAME]" and a date line featuring a small calendar icon and "[DATE]"[cite: 14]. Crisp studio clarity, balanced editorial layout, absolute face consistency[cite: 14].`,
+  featured: false,
+  tags: ["Birthday", "Collage", "Celebration", "Studio"]
+},
+{
+  id: 24,
+  title: "Neon Rim-Lit Digital Vector Portrait",
+  category: "Digital Art",
+  description: "Pitch-black background with smooth semi-realistic digital vector shading, vibrant red rim lighting, and crisp cobalt-blue attire.",
+  thumbnail: "assets/prompts/26.jpg",
+  referenceImage: "assets/prompts/26.jpg",
+  prompt: `A sleek, high-contrast digital vector illustration portrait on a solid pitch-black background[cite: 15]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, expression, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes. Rendered in a smooth, semi-realistic digital painting and vector art style with clean cell-shaded skin tones, crisp line definition, and subtle dark shadow gradients blending the lower torso seamlessly into the black background[cite: 15]. A dramatic, vibrant crimson-red rim light highlights the edges of the subject's hair, shoulder, and collar[cite: 15]. The subject wears a rich royal-blue button-down collared shirt with crisp white buttons and soft painterly folds[cite: 15]. Sharp digital brushwork, dramatic contrast, absolute face consistency.`,
+  featured: false,
+  tags: ["Digital Art", "Vector Portrait", "Neon Rim Light", "Dark Aesthetic"]
+},
+{
+  id: 25,
+  title: "Floral Triptych Traditional Birthday Poster",
+  category: "Birthday",
+  description: "Soft grey gradient backdrop with a three-column monochrome portrait collage, vibrant blooming florals, and clean celebratory typography.",
+  thumbnail: "assets/prompts/27.jpg",
+  referenceImage: "assets/prompts/27.jpg",
+  prompt: `A clean, celebratory birthday poster design on a soft pale-grey gradient background accented with lush blooming pink, orange, and deep red flowers and foliage[cite: 16]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes. Across the upper background, three vertical rectangular monochrome (black-and-white) portrait panels display different candid poses and expressions of the exact same subject in traditional ethnic attire[cite: 16]. In the lower-center foreground, a full-color three-quarter portrait of the subject wearing an ornate orange and green traditional sari with an embroidered border stands amidst the floral arrangement[cite: 16]. Below the portrait, clean serif typography displays the recipient name "[RECIPIENT NAME]" with a small capital first letter and smaller uppercase rest, followed by centered subtitle text reading "May your birthday be as unforgettable as you are every day" and a sender line reading "BEST WISHES FROM [SENDER NAME]" at the bottom[cite: 16]. Soft studio lighting, refined editorial layout, absolute face consistency.`,
+  featured: false,
+  tags: ["Birthday", "Traditional", "Floral", "Collage"]
+},
+{
+  id: 26,
+  title: "Cinematic Impasto Oil Portrait",
+  category: "Digital Art",
+  description: "Rich textured oil painting on canvas with bold impasto brushstrokes, warm expressive highlights, and vibrant royal-blue hoodie styling.",
+  thumbnail: "assets/prompts/28.jpg",
+  referenceImage: "assets/prompts/28.jpg",
+  prompt: `A cinematic fine-art oil painting portrait on textured canvas against a muted, softly blended slate-grey and forest-green painterly background[cite: 14]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes. Rendered in a rich impasto oil painting style with thick visible brushstrokes, palette-knife texture, subtle canvas weave, and warm golden highlights across the forehead, cheeks, and nose[cite: 14]. The subject is framed from the chest up with a warm, genuine smile, wearing a vibrant cobalt-blue hooded sweatshirt with drawstrings painted in bold expressive strokes[cite: 14]. Natural gallery lighting, tactile oil paint depth, absolute face consistency.`,
+  featured: false,
+  tags: ["Oil Painting", "Impasto", "Fine Art", "Portrait"]
+},
+  {
+  id: 27,
+  title: "Ink-Splash Portrait Traditional Poster",
+  category: "Editorial Portrait",
+  description: "Light background with monochrome ink-splatter portrait overlay, rustic wooden plank base, and rich magenta ethnic attire.",
+  thumbnail: "assets/prompts/29.jpg",
+  referenceImage: "assets/prompts/29.jpg",
+  prompt: `An artistic editorial portrait poster on a clean light off-white background accented with grey, charcoal, and deep magenta watercolor and ink splatters with subtle drips[cite: 15]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes. In the upper background, a large monochrome (black-and-white) close-up portrait of the exact same subject wearing ornate hanging earrings blends seamlessly into the ink-splash backdrop[cite: 15]. In the lower foreground, a full-length portrait of the subject stands on a rustic weathered wooden plank surface, wearing a rich magenta-plum embroidered traditional ethnic suit with matching dupatta, patterned trousers, statement earrings, and sandals, with hands clasped gently in front[cite: 15]. Natural studio lighting, clean editorial composition, absolute face consistency.`,
+  featured: false,
+  tags: ["Editorial", "Traditional", "Ink Splash", "Portrait"]
+},
+{
+  id: 28,
+  title: "Grid Collage Milestone Birthday Poster",
+  category: "Birthday",
+  description: "Clean white top banner with brush script lettering, multi-panel monochrome memory grid, and joyful full-color foreground portrait.",
+  thumbnail: "assets/prompts/30.jpg",
+  referenceImage: "assets/prompts/30.jpg",
+  prompt: `A clean, joyful birthday poster design on a crisp white upper banner transitioning into a multi-panel collage layout[cite: 16]. ABSOLUTE REQUIREMENT: The face, exact facial features, bone structure, eyes, nose, smile, hair, and identity of the subject from the provided reference photo must be strictly preserved without any alterations or generic AI face changes. At the top on a solid white background, flowing black brush script typography reads "Happy Birthday" accented with a textured dark red heart icon on the right[cite: 16]. Below the header, a collage of rectangular monochrome (black-and-white) candid frames shows different playful moments and poses of the exact same subject[cite: 16]. In the center foreground, a vibrant full-color portrait of the subject with a big joyful smile wears a striped top, dark denim overalls, and accessories, sitting in front of the collage[cite: 16]. Soft natural lighting, clean graphic framing, absolute face consistency[cite: 16].`,
+  featured: false,
+  tags: ["Birthday", "Collage", "Celebration", "Portrait"]
 }
+
 
 
 
